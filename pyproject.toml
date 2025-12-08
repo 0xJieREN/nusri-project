@@ -1,8 +1,9 @@
 [project]
-name = "fyp"
+name = "NUSRI_project"
 version = "0.1.0"
 description = "Add your description here"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
+    "pyqlib>=0.9.7",
     "requests>=2.32.5",
 ]
