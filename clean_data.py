@@ -10,8 +10,9 @@ df['symbol'] = 'BTCUSDT'
 # 3. 确保日期格式正确 (去掉时分秒，只留日期)
 df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
 
-# 4. 重命名列 (如果你的列名不是标准的小写，需要改名)
-# 假设你的列名已经是 date, open, high, low, close, volume
+# 4. 加密货币没有复权，所以因子永远是 1.0
+df['factor'] = 1.0 
+
 # 如果有 'amount' 列，可以保留作为额外特征，但基础 OHLCV 必须有
 
 # 5. 保存到一个新的文件夹，每个币种一个 CSV (虽然你只有一个)
