@@ -18,16 +18,18 @@ conf = {
             "class": "LGBModel",
             "module_path": "qlib.contrib.model.gbdt",
             "kwargs": {
-                "loss": "mse",
-                "colsample_bytree": 0.8, 
-                "learning_rate": 0.005,
+                "objective": "huber",          
+                "hubert_delta": 0.01,         
+                "colsample_bytree": 0.6,
                 "subsample": 0.7,
-                "lambda_l1": 0.05,    
-                "lambda_l2": 0.1,    
-                "max_depth": 6,      
+                "learning_rate": 0.005,
+                "lambda_l1": 1.5,
+                "lambda_l2": 5.0,
+                "max_depth": 5,
                 "num_leaves": 31,
-                "min_data_in_leaf": 5,  
-                "num_threads": 20,
+                "min_data_in_leaf": 800,
+                "bagging_freq": 5,
+                "num_threads": 8,
             },
         },
         "dataset": {
@@ -38,10 +40,11 @@ conf = {
                     "class": "Alpha158",
                     "module_path": "qlib.contrib.data.handler",
                     "kwargs": {
-                        "start_time": "2018-01-01",
-                        "end_time": "2024-12-01",
-                        "fit_start_time": "2018-01-01",
-                        "fit_end_time": "2022-12-31",
+                        "freq": "60min",
+                        "start_time": "2018-01-01 00:00:00",
+                        "end_time": "2024-12-01 00:00:00",
+                        "fit_start_time": "2018-01-01 00:00:00",
+                        "fit_end_time": "2022-12-31 23:00:00",
                         "instruments": market,
                         "infer_processors": [
                             {'class': 'RobustZScoreNorm', 'kwargs': {'fields_group': 'feature', 'clip_outlier': True, 'fit_start_time': '2018-01-01', 'fit_end_time': '2022-12-31'}},
@@ -54,9 +57,9 @@ conf = {
                     },
                 },
                 "segments": {
-                    "train": ("2018-01-01", "2022-12-31"),
-                    "valid": ("2023-01-01", "2023-12-31"),
-                    "test":  ("2024-01-01", "2024-12-01"),
+                    "train": ("2018-01-01 00:00:00", "2022-12-31 23:00:00"),
+                    "valid": ("2023-01-01 00:00:00", "2023-12-31 23:00:00"),
+                    "test": ("2024-01-01 00:00:00", "2024-12-01 00:00:00"),
                 },
             },
         },
@@ -72,7 +75,7 @@ if __name__ == "__main__":
         model.fit(dataset)
 
         print("正在生成预测...")
-        pred = model.predict(dataset)
+        pred = model.predict(dataset, segment="valid")
         
         # 将 Series 转换为 DataFrame ---
         # 给这一列起个名字叫 'score'
@@ -83,7 +86,7 @@ if __name__ == "__main__":
         recorder.save_objects(**{"pred.pkl": pred})
         
         # --- 计算 IC ---
-        label = dataset.prepare("test", col_set="label")
+        label = dataset.prepare("valid", col_set="label")
         label.columns = ['label'] # 确保 label 也是 DataFrame 且有列名
         
         combined = pred.join(label, how='inner') # 使用 inner join 确保索引对齐
@@ -98,7 +101,7 @@ if __name__ == "__main__":
         accuracy = same_sign.sum() / len(same_sign)
 
         print("\n" + "="*30)
-        print(f"测试集 IC       : {ic:.4f}")
+        print(f"验证集 IC       : {ic:.4f}")
         print(f"方向准确率 (Acc): {accuracy:.2%}")
         print("="*30)
         

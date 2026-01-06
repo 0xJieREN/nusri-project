@@ -11,7 +11,7 @@ This project implements machine learning workflows for cryptocurrency price pred
 
 ### Data Processing
 
-- **`clean_data.py`** - Prepares raw CSV data for QLib format (adds symbol, date formatting, factor column)
+- **`clean_data.py`** - Prepares raw CSV data for QLib format (adds symbol, date formatting, factor column, and `vwap`)
 - **`dump_bin.py`** - Converts cleaned CSV data into QLib binary format for efficient data loading
 
 ### Model Training
@@ -40,7 +40,11 @@ This project implements machine learning workflows for cryptocurrency price pred
 ## Workflow
 
 1. Run `request_1d.py` or `request_1h.py` to download Binance data
-2. Run `clean_data.py` to prepare data for QLib
-3. Run `dump_bin.py` to convert cleaned data into binary format
+2. Run `clean_data.py` to prepare data for QLib (for 1h, use Qlib freq `60min`)
+3. Run `dump_bin.py` to convert cleaned data into binary format (for 1h, use `--freq 60min`)
 4. Run `LGBM_workflow.py` to train the model
 5. Check `mlruns/` for training metrics and results
+
+Example (1h data):
+- `python clean_data.py --input BTCUSDT_1h_binance_data.csv --freq 60min --output qlib_source_data/BTCUSDT.csv`
+- `python dump_bin.py dump_all --data_path qlib_source_data --qlib_dir qlib_data/my_crypto_data --freq 60min`

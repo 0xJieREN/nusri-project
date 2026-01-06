@@ -16,3 +16,9 @@ thesis
 
 # Experiments
 mlruns/
+
+# Qlib binary data
+qlib_data/
+
+# macOS
+.DS_Store
