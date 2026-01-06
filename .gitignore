@@ -22,3 +22,6 @@ qlib_data/
 
 # macOS
 .DS_Store
+
+# Local scratch
+test/
