@@ -57,7 +57,6 @@ class DumpDataBase:
     FEATURES_DIR_NAME = "features"
     INSTRUMENTS_DIR_NAME = "instruments"
     DUMP_FILE_SUFFIX = ".bin"
-    DAILY_FORMAT = "%Y-%m-%d"
     HIGH_FREQ_FORMAT = "%Y-%m-%d %H:%M:%S"
     INSTRUMENTS_SEP = "\t"
     INSTRUMENTS_FILE_NAME = "all.txt"
@@ -70,7 +69,7 @@ class DumpDataBase:
         data_path: str,
         qlib_dir: str,
         backup_dir: str = None,
-        freq: str = "day",
+        freq: str = "60min",
         max_workers: int = 16,
         date_field_name: str = "date",
         file_suffix: str = ".csv",
@@ -89,7 +88,7 @@ class DumpDataBase:
             qlib(dump) data director
         backup_dir: str, default None
             if backup_dir is not None, backup qlib_dir to backup_dir
-        freq: str, default "day"
+        freq: str, default "60min"
             transaction frequency
         max_workers: int, default None
             number of threads
@@ -124,7 +123,7 @@ class DumpDataBase:
             self._backup_qlib_dir(Path(backup_dir).expanduser())
 
         self.freq = freq
-        self.calendar_format = self.DAILY_FORMAT if self.freq == "day" else self.HIGH_FREQ_FORMAT
+        self.calendar_format = self.HIGH_FREQ_FORMAT
 
         self.works = max_workers
         self.date_field_name = date_field_name
@@ -177,11 +176,23 @@ class DumpDataBase:
         return fname_to_code(file_path.stem.strip().lower())
 
     def get_dump_fields(self, df_columns: Iterable[str]) -> Iterable[str]:
-        return (
-            self._include_fields
-            if self._include_fields
-            else set(df_columns) - set(self._exclude_fields) if self._exclude_fields else df_columns
-        )
+        """
+        Determine which columns should be dumped as numeric feature binaries.
+
+        Notes
+        -----
+        - `date_field_name` is used as the calendar/index and should never be dumped as a feature.
+        - `symbol_field_name` is an identifier (string) and should never be dumped as a feature.
+        """
+        reserved = {self.date_field_name, self.symbol_field_name}
+        columns = [c for c in df_columns if c not in reserved]
+
+        if self._include_fields:
+            return [c for c in self._include_fields if c not in reserved]
+        if self._exclude_fields:
+            excluded = set(self._exclude_fields) | reserved
+            return [c for c in columns if c not in excluded]
+        return columns
 
     @staticmethod
     def _read_calendars(calendar_path: Path) -> List[pd.Timestamp]:
@@ -260,13 +271,14 @@ class DumpDataBase:
             bin_path = features_dir.joinpath(f"{field.lower()}.{self.freq}{self.DUMP_FILE_SUFFIX}")
             if field not in _df.columns:
                 continue
+            values = pd.to_numeric(_df[field], errors="coerce").to_numpy(dtype="<f", copy=False)
             if bin_path.exists() and self._mode == self.UPDATE_MODE:
                 # update
                 with bin_path.open("ab") as fp:
-                    np.array(_df[field]).astype("<f").tofile(fp)
+                    values.tofile(fp)
             else:
                 # append; self._mode == self.ALL_MODE or not bin_path.exists()
-                np.hstack([date_index, _df[field]]).astype("<f").tofile(str(bin_path.resolve()))
+                np.hstack([date_index, values]).astype("<f").tofile(str(bin_path.resolve()))
 
     def _dump_bin(self, file_or_data: [Path, pd.DataFrame], calendar_list: List[pd.Timestamp]):
         if not calendar_list:
@@ -395,7 +407,7 @@ class DumpDataUpdate(DumpDataBase):
         data_path: str,
         qlib_dir: str,
         backup_dir: str = None,
-        freq: str = "day",
+        freq: str = "60min",
         max_workers: int = 16,
         date_field_name: str = "date",
         file_suffix: str = ".csv",
@@ -414,7 +426,7 @@ class DumpDataUpdate(DumpDataBase):
             qlib(dump) data director
         backup_dir: str, default None
             if backup_dir is not None, backup qlib_dir to backup_dir
-        freq: str, default "day"
+        freq: str, default "60min"
             transaction frequency
         max_workers: int, default None
             number of threads
@@ -540,4 +552,3 @@ class DumpDataUpdate(DumpDataBase):
 
 if __name__ == "__main__":
     fire.Fire({"dump_all": DumpDataAll, "dump_fix": DumpDataFix, "dump_update": DumpDataUpdate})
-
