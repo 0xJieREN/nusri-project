@@ -73,7 +73,7 @@ conf = {
                                 "config": {
                                     "feature": feature_config,
                                     "label": (
-                                        ["Ref($close, -4) / $close - 1"],
+                                        ["Ref($close, -8) / $close - 1"],
                                         ["label"],
                                     ),
                                 },
@@ -132,8 +132,7 @@ def _build_dataset_kwargs(
     return dataset_kwargs
 
 
-def _evaluate_segment(dataset, model, segment: str, label_name: str):
-    print(f"\n正在生成预测 ({label_name})...")
+def _make_predictions(dataset, model, segment: str) -> pd.DataFrame:
     pred = model.predict(dataset, segment=segment).to_frame("pred")
 
     label = dataset.prepare(segment, col_set="label")
@@ -141,15 +140,17 @@ def _evaluate_segment(dataset, model, segment: str, label_name: str):
 
     combined = pred.join(label, how="inner").dropna()
     combined.columns = ["pred_return", "real_return"]
+    return combined
 
-    print("\n=== 预测值 vs 真实值 (前30行) ===")
-    print(combined.head(30))
+
+def _print_summary(combined: pd.DataFrame, label_name: str, head_n: int = 10) -> None:
+    print(f"\n=== {label_name} 预测结果 ===")
 
     if combined.empty:
         print(
             f"\n{label_name} 数据为空：请检查 segments 时间范围是否超出数据范围，或 label horizon 导致尾部被丢弃。"
         )
-        return combined
+        return
 
     ic = combined.corr().iloc[0, 1]
     rank_ic = combined.corr(method="spearman").iloc[0, 1]
@@ -180,13 +181,8 @@ def _evaluate_segment(dataset, model, segment: str, label_name: str):
         print(f"{label_name} 月度ICIR/t-stat(n={n_m}): {icir:.2f} / {t_stat:.2f}")
     print("=" * 30)
 
-    print("\n预测值统计分布:")
-    print(combined["pred_return"].describe())
-
-    print("\n真实收益(label)统计分布:")
-    print(combined["real_return"].describe())
-
-    return combined
+    print(f"\n前{head_n}条预测:")
+    print(combined.head(head_n))
 
 
 def run_single():
@@ -198,10 +194,12 @@ def run_single():
         model.fit(dataset)
 
         recorder = R.get_recorder()
-        valid_pred = _evaluate_segment(dataset, model, "valid", "验证集")
+        valid_pred = _make_predictions(dataset, model, "valid")
+        _print_summary(valid_pred, "验证集", head_n=10)
         recorder.save_objects(**{"pred_valid.pkl": valid_pred})
 
-        test_pred = _evaluate_segment(dataset, model, "test", "测试集")
+        test_pred = _make_predictions(dataset, model, "test")
+        _print_summary(test_pred, "测试集", head_n=10)
         recorder.save_objects(**{"pred_test.pkl": test_pred})
 
 
@@ -209,6 +207,8 @@ def run_rolling_monthly():
     start_ts = pd.Timestamp(ROLLING_START)
     end_ts = pd.Timestamp(ROLLING_END)
     data_start_ts = pd.Timestamp(DATA_START_TIME)
+
+    yearly_results: dict[str, list[pd.DataFrame]] = {}
 
     for month_start in pd.date_range(start=start_ts, end=end_ts, freq="MS"):
         next_month_start = month_start + pd.DateOffset(months=1)
@@ -237,27 +237,18 @@ def run_rolling_monthly():
         dataset_conf["kwargs"] = dataset_kwargs
 
         label_name = month_start_dt.strftime("%Y-%m")
+        year_key = month_start_dt.strftime("%Y")
         with R.start(experiment_name="btc_raw_return_lgb_rolling"):
-            print("\n" + "=" * 60)
-            print(
-                "滚动训练窗口: "
-                f"{dataset_kwargs['segments']['train'][0]} ~ {dataset_kwargs['segments']['train'][1]}"
-            )
-            print(
-                "预测窗口: "
-                f"{dataset_kwargs['segments']['test'][0]} ~ {dataset_kwargs['segments']['test'][1]}"
-            )
-            print("=" * 60)
-
             model = init_instance_by_config(conf["task"]["model"])
             dataset = init_instance_by_config(dataset_conf)
             model.fit(dataset)
 
-            recorder = R.get_recorder()
-            test_pred = _evaluate_segment(dataset, model, "test", label_name)
-            recorder.save_objects(
-                **{f"pred_{label_name.replace('-', '')}.pkl": test_pred}
-            )
+            test_pred = _make_predictions(dataset, model, "test")
+            yearly_results.setdefault(year_key, []).append(test_pred)
+
+    for year_key in sorted(yearly_results.keys()):
+        yearly_pred = pd.concat(yearly_results[year_key]).sort_index()
+        _print_summary(yearly_pred, f"{year_key}年", head_n=10)
 
 
 if __name__ == "__main__":
