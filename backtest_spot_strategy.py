@@ -58,11 +58,33 @@ def build_zero_benchmark(signal: pd.DataFrame) -> pd.Series:
     return pd.Series(0.0, index=datetimes)
 
 
+def align_backtest_window(
+    signal: pd.DataFrame,
+    *,
+    start_time: str,
+    end_time: str,
+) -> tuple[str, str]:
+    datetimes = signal.index.get_level_values("datetime").unique().sort_values()
+    if len(datetimes) < 2:
+        return start_time, end_time
+
+    requested_end = pd.Timestamp(end_time)
+    last_signal = datetimes[-1]
+    if requested_end >= last_signal:
+        return start_time, datetimes[-2].strftime("%Y-%m-%d %H:%M:%S")
+    return start_time, end_time
+
+
 def build_backtest_components(
     signal: pd.DataFrame,
     config: SpotStrategyConfig,
 ) -> tuple[dict, dict, dict]:
     benchmark = build_zero_benchmark(signal)
+    start_time, end_time = align_backtest_window(
+        signal,
+        start_time=config.start_time,
+        end_time=config.end_time,
+    )
     strategy_config = {
         "class": "QlibLongFlatStrategy",
         "module_path": "qlib_spot_strategy",
@@ -90,8 +112,8 @@ def build_backtest_components(
         },
     }
     backtest_config = {
-        "start_time": config.start_time,
-        "end_time": config.end_time,
+        "start_time": start_time,
+        "end_time": end_time,
         "benchmark": benchmark,
         "account": config.initial_cash,
         "exchange_kwargs": {

@@ -9,6 +9,7 @@ from qlib.backtest.position import Position
 
 from backtest_spot_strategy import (
     _expand_prediction_globs,
+    align_backtest_window,
     build_backtest_components,
     normalize_prediction_frame,
     prepare_signal_frame,
@@ -187,6 +188,28 @@ class SpotBacktestTests(unittest.TestCase):
             resolved = _expand_prediction_globs([str(pred_path)])
 
         self.assertEqual(resolved, [pred_path.resolve()])
+
+    def test_align_backtest_window_moves_end_before_last_signal_bar(self) -> None:
+        signal = pd.DataFrame(
+            {"score": [0.01, 0.02, 0.03]},
+            index=pd.MultiIndex.from_tuples(
+                [
+                    ("BTCUSDT", pd.Timestamp("2025-12-31 21:00:00")),
+                    ("BTCUSDT", pd.Timestamp("2025-12-31 22:00:00")),
+                    ("BTCUSDT", pd.Timestamp("2025-12-31 23:00:00")),
+                ],
+                names=["instrument", "datetime"],
+            ),
+        )
+
+        start_time, end_time = align_backtest_window(
+            signal,
+            start_time="2025-01-01 00:00:00",
+            end_time="2025-12-31 23:00:00",
+        )
+
+        self.assertEqual(start_time, "2025-01-01 00:00:00")
+        self.assertEqual(end_time, "2025-12-31 22:00:00")
 
     def test_single_asset_order_generator_preserves_fractional_target_weight(self) -> None:
         class StubExchange:
