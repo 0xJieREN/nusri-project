@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
 from pathlib import Path
+import warnings
 
 from phase2_strategy_research import (
     baseline_summary_row,
-    build_parameter_grid,
+    build_scan_profile,
     find_prediction_files,
     rank_scan_results,
     run_parameter_scan,
@@ -38,10 +38,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--drawdown-de-risk-threshold", type=float, default=0.08)
     parser.add_argument("--de-risk-position", type=float, default=0.5)
     parser.add_argument("--scan", action="store_true")
+    parser.add_argument("--scan-profile", default="small", choices=("small", "conservative", "conservative_fast"))
     return parser.parse_args()
 
 
 def main() -> int:
+    warnings.filterwarnings("ignore", message="Mean of empty slice", category=RuntimeWarning)
     args = parse_args()
     prediction_files = find_prediction_files(Path(args.mlruns_root), year=args.year)
     if not prediction_files:
@@ -82,15 +84,7 @@ def main() -> int:
     baseline_frame.to_csv(output_dir / "baseline_summary.csv", index=False)
 
     if args.scan:
-        parameter_grid = build_parameter_grid(
-            entry_thresholds=[0.0001, 0.0005],
-            exit_thresholds=[-0.0001, 0.0],
-            full_position_thresholds=[0.0002, 0.001],
-            min_holding_hours_list=[1, 24],
-            cooldown_hours_list=[1, 12],
-            drawdown_thresholds=[0.08],
-            de_risk_positions=[0.5],
-        )
+        parameter_grid = build_scan_profile(args.scan_profile)
         scan_results = run_parameter_scan(prediction_files, config, parameter_grid)
         ranked_results = rank_scan_results(scan_results)
         scan_results.to_csv(output_dir / "scan_results.csv", index=False)

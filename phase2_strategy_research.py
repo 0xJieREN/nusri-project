@@ -30,16 +30,21 @@ def build_parameter_grid(
     entry_thresholds: list[float],
     exit_thresholds: list[float],
     full_position_thresholds: list[float],
+    max_positions: list[float] | None = None,
     min_holding_hours_list: list[int],
     cooldown_hours_list: list[int],
     drawdown_thresholds: list[float],
     de_risk_positions: list[float],
 ) -> list[dict]:
+    if max_positions is None:
+        max_positions = [1.0]
+
     candidates: list[dict] = []
     for values in product(
         entry_thresholds,
         exit_thresholds,
         full_position_thresholds,
+        max_positions,
         min_holding_hours_list,
         cooldown_hours_list,
         drawdown_thresholds,
@@ -49,6 +54,7 @@ def build_parameter_grid(
             entry_threshold,
             exit_threshold,
             full_position_threshold,
+            max_position,
             min_holding_hours,
             cooldown_hours,
             drawdown_de_risk_threshold,
@@ -65,6 +71,7 @@ def build_parameter_grid(
                 "entry_threshold": entry_threshold,
                 "exit_threshold": exit_threshold,
                 "full_position_threshold": full_position_threshold,
+                "max_position": max_position,
                 "min_holding_hours": min_holding_hours,
                 "cooldown_hours": cooldown_hours,
                 "drawdown_de_risk_threshold": drawdown_de_risk_threshold,
@@ -72,6 +79,43 @@ def build_parameter_grid(
             }
         )
     return candidates
+
+
+def build_scan_profile(profile: str) -> list[dict]:
+    if profile == "small":
+        return build_parameter_grid(
+            entry_thresholds=[0.0001, 0.0005],
+            exit_thresholds=[-0.0001, 0.0],
+            full_position_thresholds=[0.0002, 0.001],
+            max_positions=[1.0],
+            min_holding_hours_list=[1, 24],
+            cooldown_hours_list=[1, 12],
+            drawdown_thresholds=[0.08],
+            de_risk_positions=[0.5],
+        )
+    if profile == "conservative":
+        return build_parameter_grid(
+            entry_thresholds=[0.001, 0.002, 0.003],
+            exit_thresholds=[0.0],
+            full_position_thresholds=[0.002, 0.004],
+            max_positions=[0.15, 0.25, 0.35, 0.5],
+            min_holding_hours_list=[24, 48],
+            cooldown_hours_list=[12],
+            drawdown_thresholds=[0.02, 0.05],
+            de_risk_positions=[0.0, 0.25],
+        )
+    if profile == "conservative_fast":
+        return build_parameter_grid(
+            entry_thresholds=[0.0015, 0.003],
+            exit_thresholds=[0.0],
+            full_position_thresholds=[0.003],
+            max_positions=[0.15, 0.25],
+            min_holding_hours_list=[24, 48],
+            cooldown_hours_list=[12],
+            drawdown_thresholds=[0.02, 0.05],
+            de_risk_positions=[0.0, 0.25],
+        )
+    raise ValueError(f"unknown scan profile: {profile}")
 
 
 def rank_scan_results(

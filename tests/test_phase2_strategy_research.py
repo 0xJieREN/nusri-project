@@ -7,6 +7,7 @@ import unittest
 import pandas as pd
 
 from phase2_strategy_research import (
+    build_scan_profile,
     build_parameter_grid,
     find_prediction_files,
     rank_scan_results,
@@ -45,6 +46,7 @@ class Phase2StrategyResearchTests(unittest.TestCase):
                     "entry_threshold": 0.001,
                     "exit_threshold": 0.0,
                     "full_position_threshold": 0.0015,
+                    "max_position": 1.0,
                     "min_holding_hours": 12,
                     "cooldown_hours": 6,
                     "drawdown_de_risk_threshold": 0.08,
@@ -54,6 +56,7 @@ class Phase2StrategyResearchTests(unittest.TestCase):
                     "entry_threshold": 0.001,
                     "exit_threshold": 0.0,
                     "full_position_threshold": 0.004,
+                    "max_position": 1.0,
                     "min_holding_hours": 12,
                     "cooldown_hours": 6,
                     "drawdown_de_risk_threshold": 0.08,
@@ -63,6 +66,7 @@ class Phase2StrategyResearchTests(unittest.TestCase):
                     "entry_threshold": 0.002,
                     "exit_threshold": 0.0,
                     "full_position_threshold": 0.004,
+                    "max_position": 1.0,
                     "min_holding_hours": 12,
                     "cooldown_hours": 6,
                     "drawdown_de_risk_threshold": 0.08,
@@ -102,6 +106,20 @@ class Phase2StrategyResearchTests(unittest.TestCase):
 
         self.assertEqual(list(ranked["candidate_id"]), ["c", "a", "b"])
         self.assertEqual(list(ranked["meets_constraints"]), [True, True, False])
+
+    def test_build_scan_profile_conservative_includes_lower_max_position(self) -> None:
+        grid = build_scan_profile("conservative")
+
+        self.assertTrue(len(grid) > 0)
+        self.assertTrue(all(candidate["max_position"] <= 0.5 for candidate in grid))
+        self.assertTrue(all(candidate["drawdown_de_risk_threshold"] <= 0.05 for candidate in grid))
+        self.assertTrue(all(candidate["entry_threshold"] >= 0.001 for candidate in grid))
+
+    def test_build_scan_profile_conservative_fast_stays_small(self) -> None:
+        grid = build_scan_profile("conservative_fast")
+
+        self.assertTrue(0 < len(grid) <= 32)
+        self.assertTrue(all(candidate["max_position"] <= 0.35 for candidate in grid))
 
 
 if __name__ == "__main__":
