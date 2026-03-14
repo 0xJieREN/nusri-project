@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 import warnings
 
-from phase2_strategy_research import (
+from nusri_project.strategy.phase2_strategy_research import (
     baseline_summary_row,
     build_scan_profile,
     find_prediction_files,
@@ -12,7 +12,7 @@ from phase2_strategy_research import (
     run_parameter_scan,
     run_strategy_config,
 )
-from strategy_config import SpotStrategyConfig
+from nusri_project.strategy.strategy_config import SpotStrategyConfig
 
 
 def parse_args() -> argparse.Namespace:

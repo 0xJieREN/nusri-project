@@ -1,6 +1,7 @@
 import csv
 import datetime
 import time
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 import requests
@@ -14,7 +15,7 @@ INTERVAL = '1h'  # 1小时数据
 REQUEST_START_DATE = datetime.datetime(2019, 9, 10, 8, 0, 0, tzinfo=datetime.timezone.utc)
 REQUEST_END_DATE = datetime.datetime(2025, 12, 31, 23, 59, 59, tzinfo=datetime.timezone.utc)
 
-OUTPUT_FILE = f'{SYMBOL}_{INTERVAL}_binance_data.csv'
+OUTPUT_FILE = f'data/raw/{SYMBOL}_{INTERVAL}_binance_data.csv'
 BASE_SPOT_URL = "https://api.binance.com"
 BASE_FUTURES_URL = "https://fapi.binance.com"
 HOUR_MS = 60 * 60 * 1000
@@ -166,7 +167,8 @@ print(f"Funding Rate 数据条数: {len(funding_curve)}")
 # --- 4. 写入 CSV ---
 if all_klines:
     print(f"\n数据获取完毕，共 {len(all_klines)} 条。正在写入 {OUTPUT_FILE} ...")
-    
+
+    Path(OUTPUT_FILE).parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_FILE, mode='w', newline='', encoding='utf-8') as file:
         # 使用分号 ; 作为分隔符（符合你之前的格式）
         writer = csv.writer(file, delimiter=';')

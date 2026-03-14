@@ -17,53 +17,57 @@ Python 3.12 cryptocurrency price prediction project using QLib framework and Lig
 
 ```bash
 # Download Binance 1h data
-uv run python request_1h.py
+uv run python -m scripts.data.request_1h
 
 # Clean CSV → QLib source CSV
-uv run python clean_data.py --input BTCUSDT_1h_binance_data.csv --output qlib_source_data/BTCUSDT.csv
+uv run python -m scripts.data.clean_data --input data/raw/BTCUSDT_1h_binance_data.csv --output qlib_source_data/BTCUSDT.csv
 
 # QLib source CSV → QLib binary
-uv run python dump_bin.py dump_all --data_path qlib_source_data --qlib_dir qlib_data/my_crypto_data --freq 60min
+uv run python -m scripts.data.dump_bin dump_all --data_path qlib_source_data --qlib_dir qlib_data/my_crypto_data --freq 60min
 
 # Train LightGBM model (single or rolling mode)
-uv run python LGBM_workflow.py
+uv run python -m scripts.training.lgbm_workflow
 
 # Export feature importance
-uv run python dump_lgbm_feature_importance.py --importance-type gain --out lgbm_feature_importance.csv --top 20
+uv run python -m scripts.analysis.dump_lgbm_feature_importance --importance-type gain --out reports/feature_importance/lgbm_feature_importance.csv --top 20
 
-# Run smoke test (verify QLib data loads)
-uv run python test/test_qlib.py
+# Run spot backtest
+uv run python -m scripts.analysis.backtest_spot_strategy --pred-glob "/absolute/path/to/pred_2024*.pkl" --provider-uri ./qlib_data/my_crypto_data
+
+# Run phase 2 baseline / scan
+uv run python -m scripts.analysis.run_phase2_baseline --mlruns-root ./mlruns --provider-uri ./qlib_data/my_crypto_data --year 2024 --scan
 ```
 
 ## Architecture
 
 ```
-request_1h.py        → Download raw Binance data (CSV)
-    ↓
-clean_data.py        → Format CSV for QLib (add symbol, date format)
-    ↓
-dump_bin.py          → Convert to QLib binary format
-    ↓
-LGBM_workflow.py    → Main training pipeline (QLib + LightGBM)
-    ↓
-mlruns/              → MLflow tracking output
+scripts/data/request_1h.py                → Download raw Binance data
+scripts/data/clean_data.py                → Format CSV for QLib
+scripts/data/dump_bin.py                  → Convert source CSV to QLib binary
+scripts/training/lgbm_workflow.py         → Training entrypoint
+nusri_project/training/lgbm_workflow.py   → Training workflow logic
+scripts/analysis/backtest_spot_strategy.py → Spot backtest entrypoint
+nusri_project/strategy/*                  → Strategy and scan helpers
 ```
 
 **Key modules:**
-- `alpha261_config.py` — Alpha261 and Top23 feature configurations
-- `LGBM_workflow.py` — Model training with single/rolling modes, configurable feature sets
+- `nusri_project/config/alpha261_config.py` — Alpha261 and Top23 feature configurations
+- `nusri_project/training/lgbm_workflow.py` — Model training with single/rolling modes, configurable feature sets
+- `nusri_project/strategy/backtest_spot_strategy.py` — QLib-first spot backtest wrapper
+- `nusri_project/strategy/phase2_strategy_research.py` — phase 2 scan helpers
 - `qlib_data/my_crypto_data/` — QLib binary data directory
 
-**Configurable options in LGBM_workflow.py:**
+**Configurable options in `nusri_project/training/lgbm_workflow.py`:**
 - `FEATURE_SET`: "alpha261" or "top23"
 - `RUN_MODE`: "single" or "rolling"
 
 ## Data Paths
 
-- Raw data: `qlib_source_data/`
+- Raw downloads: `data/raw/`
+- QLib source CSV: `qlib_source_data/`
 - QLib binary: `qlib_data/my_crypto_data/`
 - MLflow logs: `mlruns/`
-- Generated CSV: `BTCUSDT_1h_binance_data.csv`
+- Archived artifacts: `archive/artifacts/`
 
 ## Important Notes
 

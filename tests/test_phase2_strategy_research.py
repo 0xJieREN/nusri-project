@@ -6,7 +6,7 @@ import unittest
 
 import pandas as pd
 
-from phase2_strategy_research import (
+from nusri_project.strategy.phase2_strategy_research import (
     build_scan_profile,
     build_parameter_grid,
     find_prediction_files,

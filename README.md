@@ -1,45 +1,85 @@
 # NUSRI Project
 
-This project implements machine learning workflows for cryptocurrency price prediction using QLib and LightGBM models.
+Python 3.12 cryptocurrency research repository built around QLib and LightGBM for BTCUSDT hourly prediction, signal evaluation, and spot strategy backtesting.
 
-## Project Structure
+## Structure
 
-### Data Acquisition
+### Active entrypoints
 
-- **`request_1h.py`** - Downloads hourly (1h) BTCUSDT data from Binance API with retry logic
+- `scripts/data/` — data download and preparation commands
+- `scripts/training/` — training commands
+- `scripts/analysis/` — feature importance, backtest, and strategy scan commands
 
-### Data Processing
+### Reusable logic
 
-- **`clean_data.py`** - Prepares raw CSV data for QLib format (adds symbol, date formatting, and market microstructure fields)
-- **`dump_bin.py`** - Converts cleaned CSV data into QLib binary format for efficient data loading
+- `nusri_project/config/` — factor and workflow config
+- `nusri_project/training/` — training workflow logic
+- `nusri_project/strategy/` — spot strategy, backtest wrapper, and phase 2 scan helpers
 
-### Model Training
+### Data and outputs
 
-- **`LGBM_workflow.py`** - Main training pipeline using QLib framework with LightGBM model
-  - Configures Alpha158 features for feature engineering
-  - Trains on historical data (2018-2022)
-  - Validates on out-of-sample period (2023-2024)
-  - Logs metrics via MLflow
+- `data/raw/` — active raw market downloads
+- `qlib_source_data/` — cleaned CSVs for QLib ingestion
+- `qlib_data/my_crypto_data/` — QLib binary data
+- `mlruns/` — MLflow experiment outputs
 
-### Data
+### Archived legacy files
 
-- **`qlib_source_data/`** - Cleaned raw data in CSV format
-- **`qlib_data/my_crypto_data/`** - Processed binary data for QLib
-- **`mlruns/`** - MLflow experiment tracking logs
+- `archive/artifacts/` — archived generated CSV artifacts from earlier iterations
+- `archive/legacy_test/` — archived old `test/` directory and Alpha158 notes/scripts
 
-## Dependencies
+## Common Commands
 
-- pyqlib >= 0.9.7
-- requests >= 2.32.5
+### Download Binance 1h data
 
-## Workflow
+```bash
+uv run python -m scripts.data.request_1h
+```
 
-1. Run `request_1h.py` to download Binance data
-2. Run `clean_data.py` to prepare data for QLib
-3. Run `dump_bin.py` to convert cleaned data into binary format (for 1h, use `--freq 60min`)
-4. Run `LGBM_workflow.py` to train the model
-5. Check `mlruns/` for training metrics and results
+### Clean raw CSV into QLib source format
 
-Example (1h data):
-- `python clean_data.py --input BTCUSDT_1h_binance_data.csv --output qlib_source_data/BTCUSDT.csv`
-- `python dump_bin.py dump_all --data_path qlib_source_data --qlib_dir qlib_data/my_crypto_data --freq 60min`
+```bash
+uv run python -m scripts.data.clean_data --input data/raw/BTCUSDT_1h_binance_data.csv --output qlib_source_data/BTCUSDT.csv
+```
+
+### Dump QLib binary data
+
+```bash
+uv run python -m scripts.data.dump_bin dump_all --data_path qlib_source_data --qlib_dir qlib_data/my_crypto_data --freq 60min
+```
+
+### Train LightGBM workflow
+
+```bash
+uv run python -m scripts.training.lgbm_workflow
+```
+
+Optional:
+
+```bash
+uv run python -m scripts.training.lgbm_workflow --feature-set top23 --run-mode rolling
+```
+
+### Export feature importance
+
+```bash
+uv run python -m scripts.analysis.dump_lgbm_feature_importance --importance-type gain --out reports/feature_importance/lgbm_feature_importance.csv --top 20
+```
+
+### Run spot backtest on saved prediction files
+
+```bash
+uv run python -m scripts.analysis.backtest_spot_strategy --pred-glob "/absolute/path/to/pred_2024*.pkl" --provider-uri ./qlib_data/my_crypto_data
+```
+
+### Run phase 2 baseline and parameter scan
+
+```bash
+uv run python -m scripts.analysis.run_phase2_baseline --mlruns-root ./mlruns --provider-uri ./qlib_data/my_crypto_data --year 2024 --scan
+```
+
+## Notes
+
+- QLib binary data must exist before training or backtesting.
+- Spot backtests now use a QLib-first implementation with a custom single-asset order generator for fractional crypto sizing.
+- Generated reports and temporary research outputs should not be committed unless explicitly needed.

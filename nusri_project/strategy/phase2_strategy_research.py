@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from backtest_spot_strategy import (
+from nusri_project.strategy.backtest_spot_strategy import (
     compute_monthly_returns,
     load_prediction_frames,
     prepare_signal_frame,
     run_qlib_backtest,
     summarize_report,
 )
-from strategy_config import SpotStrategyConfig
+from nusri_project.strategy.strategy_config import SpotStrategyConfig
 
 
 def find_prediction_files(mlruns_root: Path, year: int) -> list[Path]:

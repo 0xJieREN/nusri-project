@@ -7,7 +7,7 @@ import unittest
 import pandas as pd
 from qlib.backtest.position import Position
 
-from backtest_spot_strategy import (
+from nusri_project.strategy.backtest_spot_strategy import (
     _expand_prediction_globs,
     align_backtest_window,
     build_backtest_components,
@@ -15,8 +15,8 @@ from backtest_spot_strategy import (
     prepare_signal_frame,
     summarize_report,
 )
-from qlib_spot_strategy import QlibSingleAssetOrderGen, compute_target_weight
-from strategy_config import SpotStrategyConfig
+from nusri_project.strategy.qlib_spot_strategy import QlibSingleAssetOrderGen, compute_target_weight
+from nusri_project.strategy.strategy_config import SpotStrategyConfig
 
 
 class SpotBacktestTests(unittest.TestCase):
@@ -140,7 +140,7 @@ class SpotBacktestTests(unittest.TestCase):
         strategy_config, executor_config, backtest_config = build_backtest_components(signal, config)
 
         self.assertEqual(strategy_config["class"], "QlibLongFlatStrategy")
-        self.assertEqual(strategy_config["module_path"], "qlib_spot_strategy")
+        self.assertEqual(strategy_config["module_path"], "nusri_project.strategy.qlib_spot_strategy")
         self.assertIs(strategy_config["kwargs"]["signal"], signal)
         self.assertEqual(executor_config["class"], "SimulatorExecutor")
         self.assertEqual(executor_config["module_path"], "qlib.backtest.executor")

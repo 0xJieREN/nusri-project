@@ -57,8 +57,8 @@ Expected: import failure because the new wrapper module does not exist yet.
 ### Task 3: Implement the Qlib-first backtest wrapper
 
 **Files:**
-- Create: `strategy_config.py`
-- Create: `backtest_spot_strategy.py`
+- Create: `nusri_project/strategy/strategy_config.py`
+- Create: `nusri_project/strategy/backtest_spot_strategy.py`
 
 **Step 1: Write minimal implementation**
 
@@ -84,7 +84,7 @@ Expected: all tests pass.
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python backtest_spot_strategy.py --help
+/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.analysis.backtest_spot_strategy --help
 ```
 
 Expected: CLI help prints without error.
@@ -92,8 +92,8 @@ Expected: CLI help prints without error.
 ### Task 4: Verify and commit phase 1
 
 **Files:**
-- Verify: `strategy_config.py`
-- Verify: `backtest_spot_strategy.py`
+- Verify: `nusri_project/strategy/strategy_config.py`
+- Verify: `nusri_project/strategy/backtest_spot_strategy.py`
 - Verify: `tests/test_backtest_spot_strategy.py`
 
 **Step 1: Re-run verification**
@@ -102,12 +102,12 @@ Run:
 
 ```bash
 /Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy -v
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python backtest_spot_strategy.py --help
+/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.analysis.backtest_spot_strategy --help
 ```
 
 **Step 2: Commit**
 
 ```bash
-git add strategy_config.py backtest_spot_strategy.py tests/test_backtest_spot_strategy.py
+git add nusri_project/strategy/strategy_config.py nusri_project/strategy/backtest_spot_strategy.py tests/test_backtest_spot_strategy.py
 git commit -m "feat: add minimal spot backtest layer"
 ```

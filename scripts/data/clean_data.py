@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-DEFAULT_1H_INPUT = "BTCUSDT_1h_binance_data.csv"
+DEFAULT_1H_INPUT = "data/raw/BTCUSDT_1h_binance_data.csv"
 
 
 def _format_date(series: pd.Series) -> pd.Series:

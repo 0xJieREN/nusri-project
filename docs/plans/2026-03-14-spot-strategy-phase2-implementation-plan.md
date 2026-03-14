@@ -51,8 +51,8 @@ Expected: import failure because the new phase 2 helper module does not exist ye
 ### Task 3: Implement phase 2 research helpers
 
 **Files:**
-- Create: `phase2_strategy_research.py`
-- Create: `run_phase2_baseline.py`
+- Create: `nusri_project/strategy/phase2_strategy_research.py`
+- Create: `scripts/analysis/run_phase2_baseline.py`
 
 **Step 1: Write minimal implementation**
 
@@ -75,14 +75,14 @@ Expected: all tests pass.
 ### Task 4: Run a real 2024 baseline and small scan
 
 **Files:**
-- Verify: `run_phase2_baseline.py`
+- Verify: `scripts/analysis/run_phase2_baseline.py`
 
 **Step 1: Run the real baseline**
 
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python run_phase2_baseline.py --mlruns-root /Users/jared/src/nusri-project/NUSRI_project/mlruns --provider-uri /Users/jared/src/nusri-project/NUSRI_project/qlib_data/my_crypto_data --year 2024 --output-dir reports/phase2_2024
+/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.analysis.run_phase2_baseline --mlruns-root /Users/jared/src/nusri-project/NUSRI_project/mlruns --provider-uri /Users/jared/src/nusri-project/NUSRI_project/qlib_data/my_crypto_data --year 2024 --output-dir reports/phase2_2024
 ```
 
 Expected: baseline artifacts and scan CSV files are generated.
@@ -90,8 +90,8 @@ Expected: baseline artifacts and scan CSV files are generated.
 ### Task 5: Verify and commit phase 2 foundation
 
 **Files:**
-- Verify: `phase2_strategy_research.py`
-- Verify: `run_phase2_baseline.py`
+- Verify: `nusri_project/strategy/phase2_strategy_research.py`
+- Verify: `scripts/analysis/run_phase2_baseline.py`
 - Verify: `tests/test_phase2_strategy_research.py`
 
 **Step 1: Re-run verification**
@@ -100,12 +100,12 @@ Run:
 
 ```bash
 /Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m unittest tests.test_phase2_strategy_research -v
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python run_phase2_baseline.py --help
+/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.analysis.run_phase2_baseline --help
 ```
 
 **Step 2: Commit**
 
 ```bash
-git add phase2_strategy_research.py run_phase2_baseline.py tests/test_phase2_strategy_research.py
+git add nusri_project/strategy/phase2_strategy_research.py scripts/analysis/run_phase2_baseline.py tests/test_phase2_strategy_research.py
 git commit -m "feat: add phase2 strategy baseline scan"
 ```

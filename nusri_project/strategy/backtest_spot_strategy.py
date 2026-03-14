@@ -11,7 +11,7 @@ import qlib
 from qlib.backtest import backtest as qlib_backtest
 from qlib.constant import REG_CN
 
-from strategy_config import SpotStrategyConfig
+from nusri_project.strategy.strategy_config import SpotStrategyConfig
 
 
 REQUIRED_COLUMNS = ["pred_return"]
@@ -87,7 +87,7 @@ def build_backtest_components(
     )
     strategy_config = {
         "class": "QlibLongFlatStrategy",
-        "module_path": "qlib_spot_strategy",
+        "module_path": "nusri_project.strategy.qlib_spot_strategy",
         "kwargs": {
             "signal": signal,
             "instrument": config.instrument,

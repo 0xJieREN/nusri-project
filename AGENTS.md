@@ -31,7 +31,7 @@
 
 ### 2.1 获取 Binance 小时级数据（1h）
 
-- `uv run python request_1h.py`
+- `uv run python -m scripts.data.request_1h`
 
 输出示例：`BTCUSDT_1h_binance_data.csv`
 
@@ -41,7 +41,7 @@
 
 ### 2.2 原始 CSV → QLib source CSV
 
-- `uv run python clean_data.py --input BTCUSDT_1h_binance_data.csv --output qlib_source_data/BTCUSDT.csv`
+- `uv run python -m scripts.data.clean_data --input data/raw/BTCUSDT_1h_binance_data.csv --output qlib_source_data/BTCUSDT.csv`
 
 要点：
 - 默认分隔符 `;`（可 `--sep` 修改）
@@ -50,15 +50,15 @@
 
 ### 2.3 QLib source CSV → QLib binary 数据
 
-- `uv run python dump_bin.py dump_all --data_path qlib_source_data --qlib_dir qlib_data/my_crypto_data --freq 60min`
+- `uv run python -m scripts.data.dump_bin dump_all --data_path qlib_source_data --qlib_dir qlib_data/my_crypto_data --freq 60min`
 
 要点：
-- `dump_bin.py` 使用 `fire` CLI
+- `scripts/data/dump_bin.py` 使用 `fire` CLI
 - 输出目录包含 `calendars/ features/ instruments/ ...`
 
 ### 2.4 训练 LightGBM（主流程）
 
-- `uv run python LGBM_workflow.py`
+- `uv run python -m scripts.training.lgbm_workflow`
 
 要点：
 - `provider_uri = ./qlib_data/my_crypto_data`
@@ -66,7 +66,7 @@
 
 ### 2.5 导出特征重要性
 
-- `uv run python dump_lgbm_feature_importance.py --importance-type gain --out lgbm_feature_importance.csv --top 20`
+- `uv run python -m scripts.analysis.dump_lgbm_feature_importance --importance-type gain --out reports/feature_importance/lgbm_feature_importance.csv --top 20`
 
 ---
 
@@ -133,10 +133,10 @@
 
 ### 5.5 错误处理与日志
 
-- 网络请求必须有 timeout；重试要有界并带退避；已知不可恢复错误可减少重试（参考 `request_1h.py`）
+- 网络请求必须有 timeout；重试要有界并带退避；已知不可恢复错误可减少重试（参考 `scripts/data/request_1h.py`）
 - 不要静默吞异常；返回空结果时调用方必须可处理
 - 抛异常优先具体类型：`ValueError` / `FileNotFoundError` / `RuntimeError`
-- 脚本中可用 `print`；若修改 `dump_bin.py`，保持 `loguru.logger` 风格
+- 脚本中可用 `print`；若修改 `scripts/data/dump_bin.py`，保持 `loguru.logger` 风格
 
 ### 5.6 路径与 I/O
 
@@ -150,7 +150,7 @@
 
 - 默认 QLib 数据目录：`./qlib_data/my_crypto_data`
 - 高频时间格式：`%Y-%m-%d %H:%M:%S`
-- `alpha261_config.py` 因子名必须唯一（重复会 `raise ValueError("duplicate factor name")`）
+- `nusri_project/config/alpha261_config.py` 因子名必须唯一（重复会 `raise ValueError("duplicate factor name")`）
 - 涉及策略回测、执行器、交易成本、组合分析时，先检查 `Qlib` 官方现成能力是否已覆盖，例如 `qlib.backtest.backtest`、`qlib.contrib.evaluate.backtest_daily`、`qlib.workflow.record_temp.PortAnaRecord`
 - 如果 `Qlib` 已有合适能力，优先通过配置、封装和对接现有接口实现；不要先手写一套平行回测框架
 - 只有在 `Qlib` 现成接口无法准确表达当前需求时，才允许补充自定义实现；并在代码或文档中明确说明缺口

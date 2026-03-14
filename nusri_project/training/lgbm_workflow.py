@@ -1,3 +1,4 @@
+import argparse
 from copy import deepcopy
 from datetime import datetime
 from typing import cast
@@ -7,10 +8,11 @@ import qlib
 from qlib.constant import REG_CN
 from qlib.utils import init_instance_by_config
 from qlib.workflow import R
-from alpha261_config import get_alpha261_config, get_top23_config
+from nusri_project.config.alpha261_config import get_alpha261_config, get_top23_config
 
-provider_uri = "./qlib_data/my_crypto_data"
-qlib.init(provider_uri=provider_uri, region=REG_CN)
+PROVIDER_URI = "./qlib_data/my_crypto_data"
+DEFAULT_FEATURE_SET = "top23"
+DEFAULT_RUN_MODE = "rolling"
 
 market = "all"
 benchmark = "BTCUSDT"
@@ -23,92 +25,97 @@ ROLLING_START = "2024-01-01 00:00:00"
 ROLLING_END = "2025-12-31 23:00:00"
 ROLLING_TRAIN_YEARS = 2
 
-# Feature set selection: "alpha261" or "top23"
-FEATURE_SET = "top23"
+def init_qlib(provider_uri: str = PROVIDER_URI) -> None:
+    qlib.init(provider_uri=provider_uri, region=REG_CN)
 
-# Run mode: "single" or "rolling"
-RUN_MODE = "rolling"
 
-if FEATURE_SET == "alpha261":
-    feature_config = get_alpha261_config()
-elif FEATURE_SET == "top23":
-    feature_config = get_top23_config()
-else:
-    raise ValueError(f"Unknown FEATURE_SET: {FEATURE_SET}")
+def get_feature_config(feature_set: str):
+    if feature_set == "alpha261":
+        return get_alpha261_config()
+    if feature_set == "top23":
+        return get_top23_config()
+    raise ValueError(f"Unknown FEATURE_SET: {feature_set}")
 
-conf = {
-    "task": {
-        "model": {
-            "class": "LGBModel",
-            "module_path": "qlib.contrib.model.gbdt",
-            "kwargs": {
-                "loss": "mse",
-                "colsample_bytree": 0.6,
-                "subsample": 0.7,
-                "learning_rate": 0.005,
-                "lambda_l1": 1.5,
-                "lambda_l2": 5.0,
-                "max_depth": 5,
-                "num_leaves": 31,
-                "min_data_in_leaf": 100,
-                "bagging_freq": 5,
-                "num_threads": 8,
+
+def build_conf(feature_set: str = DEFAULT_FEATURE_SET) -> dict:
+    feature_config = get_feature_config(feature_set)
+    return {
+        "task": {
+            "model": {
+                "class": "LGBModel",
+                "module_path": "qlib.contrib.model.gbdt",
+                "kwargs": {
+                    "loss": "mse",
+                    "colsample_bytree": 0.6,
+                    "subsample": 0.7,
+                    "learning_rate": 0.005,
+                    "lambda_l1": 1.5,
+                    "lambda_l2": 5.0,
+                    "max_depth": 5,
+                    "num_leaves": 31,
+                    "min_data_in_leaf": 100,
+                    "bagging_freq": 5,
+                    "num_threads": 8,
+                },
             },
-        },
-        "dataset": {
-            "class": "DatasetH",
-            "module_path": "qlib.data.dataset",
-            "kwargs": {
-                "handler": {
-                    "class": "DataHandlerLP",
-                    "module_path": "qlib.data.dataset.handler",
-                    "kwargs": {
-                        "start_time": DATA_START_TIME,
-                        "end_time": DATA_END_TIME,
-                        "instruments": market,
-                        "data_loader": {
-                            "class": "QlibDataLoader",
-                            "module_path": "qlib.data.dataset.loader",
-                            "kwargs": {
-                                "config": {
-                                    "feature": feature_config,
-                                    "label": (
-                                        ["Ref($close, -8) / $close - 1"],
-                                        ["label"],
-                                    ),
-                                },
-                                "freq": "60min",
-                            },
-                        },
-                        "infer_processors": [
-                            {
-                                "class": "RobustZScoreNorm",
+            "dataset": {
+                "class": "DatasetH",
+                "module_path": "qlib.data.dataset",
+                "kwargs": {
+                    "handler": {
+                        "class": "DataHandlerLP",
+                        "module_path": "qlib.data.dataset.handler",
+                        "kwargs": {
+                            "start_time": DATA_START_TIME,
+                            "end_time": DATA_END_TIME,
+                            "instruments": market,
+                            "data_loader": {
+                                "class": "QlibDataLoader",
+                                "module_path": "qlib.data.dataset.loader",
                                 "kwargs": {
-                                    "fields_group": "feature",
-                                    "clip_outlier": True,
-                                    "fit_start_time": DATA_START_TIME,
-                                    "fit_end_time": "2023-12-31 19:00:00",
+                                    "config": {
+                                        "feature": feature_config,
+                                        "label": (
+                                            ["Ref($close, -8) / $close - 1"],
+                                            ["label"],
+                                        ),
+                                    },
+                                    "freq": "60min",
                                 },
                             },
-                            {"class": "Fillna", "kwargs": {"fields_group": "feature"}},
-                        ],
-                        "learn_processors": [
-                            {"class": "DropnaLabel"},
-                        ],
+                            "infer_processors": [
+                                {
+                                    "class": "RobustZScoreNorm",
+                                    "kwargs": {
+                                        "fields_group": "feature",
+                                        "clip_outlier": True,
+                                        "fit_start_time": DATA_START_TIME,
+                                        "fit_end_time": "2023-12-31 19:00:00",
+                                    },
+                                },
+                                {"class": "Fillna", "kwargs": {"fields_group": "feature"}},
+                            ],
+                            "learn_processors": [
+                                {"class": "DropnaLabel"},
+                            ],
+                        },
+                    },
+                    "segments": {
+                        "train": ("2019-09-10 08:00:00", "2023-12-31 19:00:00"),
+                        "valid": ("2024-01-01 00:00:00", "2024-12-31 19:00:00"),
+                        "test": ("2025-01-01 00:00:00", "2025-12-31 23:00:00"),
                     },
                 },
-                "segments": {
-                    "train": ("2019-09-10 08:00:00", "2023-12-31 19:00:00"),
-                    "valid": ("2024-01-01 00:00:00", "2024-12-31 19:00:00"),
-                    "test": ("2025-01-01 00:00:00", "2025-12-31 23:00:00"),
-                },
             },
         },
-    },
-}
+    }
+
+
+conf = build_conf()
 
 
 def _build_dataset_kwargs(
+    conf: dict,
     train_start: str,
     train_end: str,
     test_start: str,
@@ -185,12 +192,13 @@ def _print_summary(combined: pd.DataFrame, label_name: str, head_n: int = 10) ->
     print(combined.head(head_n))
 
 
-def run_single():
+def run_single(workflow_conf: dict | None = None):
+    workflow_conf = conf if workflow_conf is None else workflow_conf
     with R.start(experiment_name="btc_raw_return_lgb"):
         print("正在训练模型...")
 
-        model = init_instance_by_config(conf["task"]["model"])
-        dataset = init_instance_by_config(conf["task"]["dataset"])
+        model = init_instance_by_config(workflow_conf["task"]["model"])
+        dataset = init_instance_by_config(workflow_conf["task"]["dataset"])
         model.fit(dataset)
 
         recorder = R.get_recorder()
@@ -203,7 +211,8 @@ def run_single():
         recorder.save_objects(**{"pred_test.pkl": test_pred})
 
 
-def run_rolling_monthly():
+def run_rolling_monthly(workflow_conf: dict | None = None):
+    workflow_conf = conf if workflow_conf is None else workflow_conf
     start_ts = pd.Timestamp(ROLLING_START)
     end_ts = pd.Timestamp(ROLLING_END)
     data_start_ts = pd.Timestamp(DATA_START_TIME)
@@ -227,19 +236,20 @@ def run_rolling_monthly():
         train_end_dt = cast(datetime, train_end.to_pydatetime())
 
         dataset_kwargs = _build_dataset_kwargs(
+            workflow_conf,
             train_start_dt.strftime("%Y-%m-%d %H:%M:%S"),
             train_end_dt.strftime("%Y-%m-%d %H:%M:%S"),
             month_start_dt.strftime("%Y-%m-%d %H:%M:%S"),
             month_end_dt.strftime("%Y-%m-%d %H:%M:%S"),
         )
 
-        dataset_conf = deepcopy(conf["task"]["dataset"])
+        dataset_conf = deepcopy(workflow_conf["task"]["dataset"])
         dataset_conf["kwargs"] = dataset_kwargs
 
         label_name = month_start_dt.strftime("%Y-%m")
         year_key = month_start_dt.strftime("%Y")
         with R.start(experiment_name="btc_raw_return_lgb_rolling"):
-            model = init_instance_by_config(conf["task"]["model"])
+            model = init_instance_by_config(workflow_conf["task"]["model"])
             dataset = init_instance_by_config(dataset_conf)
             model.fit(dataset)
 
@@ -251,10 +261,26 @@ def run_rolling_monthly():
         _print_summary(yearly_pred, f"{year_key}年", head_n=10)
 
 
-if __name__ == "__main__":
-    if RUN_MODE == "single":
-        run_single()
-    elif RUN_MODE == "rolling":
-        run_rolling_monthly()
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train the BTCUSDT LightGBM workflow.")
+    parser.add_argument("--feature-set", choices=("alpha261", "top23"), default=DEFAULT_FEATURE_SET)
+    parser.add_argument("--run-mode", choices=("single", "rolling"), default=DEFAULT_RUN_MODE)
+    parser.add_argument("--provider-uri", default=PROVIDER_URI)
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    init_qlib(provider_uri=args.provider_uri)
+    workflow_conf = build_conf(feature_set=args.feature_set)
+    if args.run_mode == "single":
+        run_single(workflow_conf)
+    elif args.run_mode == "rolling":
+        run_rolling_monthly(workflow_conf)
     else:
-        raise ValueError(f"Unknown RUN_MODE: {RUN_MODE}")
+        raise ValueError(f"Unknown RUN_MODE: {args.run_mode}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

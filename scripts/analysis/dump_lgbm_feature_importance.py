@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 # Reuse the exact config and qlib init from the training script.
-from LGBM_workflow import conf  # noqa: E402
+from nusri_project.training.lgbm_workflow import build_conf, init_qlib  # noqa: E402
 from qlib.utils import init_instance_by_config  # noqa: E402
 
 
@@ -18,8 +18,14 @@ def main() -> int:
     )
     parser.add_argument(
         "--out",
-        default="lgbm_feature_importance.csv",
+        default="reports/feature_importance/lgbm_feature_importance.csv",
         help="Output CSV path.",
+    )
+    parser.add_argument(
+        "--feature-set",
+        choices=("alpha261", "top23"),
+        default="top23",
+        help="Feature set used by the training workflow.",
     )
     parser.add_argument(
         "--top",
@@ -29,6 +35,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    init_qlib()
+    conf = build_conf(feature_set=args.feature_set)
     model = init_instance_by_config(conf["task"]["model"])
     dataset = init_instance_by_config(conf["task"]["dataset"])
     model.fit(dataset)
@@ -53,6 +61,7 @@ def main() -> int:
     ).sort_values(by=f"importance_{args.importance_type}", ascending=False)
 
     out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_path, index=False)
 
     print(f"Saved: {out_path}")
