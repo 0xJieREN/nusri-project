@@ -60,7 +60,7 @@ Adjust tests so they import the new package paths and verify the new Qlib module
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy tests.test_phase2_strategy_research -v
+/Users/jared/src/nusri-project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy tests.test_phase2_strategy_research -v
 ```
 
 Expected: failures caused by old imports/module paths.
@@ -74,7 +74,7 @@ Add package `__init__.py` files, move code, and make wrappers call package `main
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy tests.test_phase2_strategy_research -v
+/Users/jared/src/nusri-project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy tests.test_phase2_strategy_research -v
 ```
 
 Expected: all tests pass.
@@ -107,9 +107,9 @@ Document:
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.analysis.backtest_spot_strategy --help
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.analysis.run_phase2_baseline --help
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.training.lgbm_workflow --help
+/Users/jared/src/nusri-project/.venv/bin/python -m scripts.analysis.backtest_spot_strategy --help
+/Users/jared/src/nusri-project/.venv/bin/python -m scripts.analysis.run_phase2_baseline --help
+/Users/jared/src/nusri-project/.venv/bin/python -m scripts.training.lgbm_workflow --help
 ```
 
 **Step 2: Confirm no stray temp artifacts remain**

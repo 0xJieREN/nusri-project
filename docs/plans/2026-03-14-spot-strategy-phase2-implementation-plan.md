@@ -43,7 +43,7 @@ Cover:
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m unittest tests.test_phase2_strategy_research -v
+/Users/jared/src/nusri-project/.venv/bin/python -m unittest tests.test_phase2_strategy_research -v
 ```
 
 Expected: import failure because the new phase 2 helper module does not exist yet.
@@ -67,7 +67,7 @@ Implement:
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m unittest tests.test_phase2_strategy_research -v
+/Users/jared/src/nusri-project/.venv/bin/python -m unittest tests.test_phase2_strategy_research -v
 ```
 
 Expected: all tests pass.
@@ -82,7 +82,7 @@ Expected: all tests pass.
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.analysis.run_phase2_baseline --mlruns-root /Users/jared/src/nusri-project/NUSRI_project/mlruns --provider-uri /Users/jared/src/nusri-project/NUSRI_project/qlib_data/my_crypto_data --year 2024 --output-dir reports/phase2_2024
+/Users/jared/src/nusri-project/.venv/bin/python -m scripts.analysis.run_phase2_baseline --mlruns-root /Users/jared/src/nusri-project/mlruns --provider-uri /Users/jared/src/nusri-project/qlib_data/my_crypto_data --year 2024 --output-dir reports/phase2_2024
 ```
 
 Expected: baseline artifacts and scan CSV files are generated.
@@ -99,8 +99,8 @@ Expected: baseline artifacts and scan CSV files are generated.
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m unittest tests.test_phase2_strategy_research -v
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.analysis.run_phase2_baseline --help
+/Users/jared/src/nusri-project/.venv/bin/python -m unittest tests.test_phase2_strategy_research -v
+/Users/jared/src/nusri-project/.venv/bin/python -m scripts.analysis.run_phase2_baseline --help
 ```
 
 **Step 2: Commit**

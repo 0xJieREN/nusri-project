@@ -49,7 +49,7 @@ Cover:
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy -v
+/Users/jared/src/nusri-project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy -v
 ```
 
 Expected: import failure because the new wrapper module does not exist yet.
@@ -74,7 +74,7 @@ Implement:
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy -v
+/Users/jared/src/nusri-project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy -v
 ```
 
 Expected: all tests pass.
@@ -84,7 +84,7 @@ Expected: all tests pass.
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.analysis.backtest_spot_strategy --help
+/Users/jared/src/nusri-project/.venv/bin/python -m scripts.analysis.backtest_spot_strategy --help
 ```
 
 Expected: CLI help prints without error.
@@ -101,8 +101,8 @@ Expected: CLI help prints without error.
 Run:
 
 ```bash
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy -v
-/Users/jared/src/nusri-project/NUSRI_project/.venv/bin/python -m scripts.analysis.backtest_spot_strategy --help
+/Users/jared/src/nusri-project/.venv/bin/python -m unittest tests.test_backtest_spot_strategy -v
+/Users/jared/src/nusri-project/.venv/bin/python -m scripts.analysis.backtest_spot_strategy --help
 ```
 
 **Step 2: Commit**

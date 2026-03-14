@@ -1,4 +1,4 @@
-# AGENTS.md — NUSRI_project（智能编码代理指南）
+# AGENTS.md — nusri-project（智能编码代理指南）
 
 本仓库是 Python 3.12 的加密货币价格预测项目：
 - QLib：数据处理 / 特征工程 / 数据集抽象
