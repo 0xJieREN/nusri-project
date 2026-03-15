@@ -6,6 +6,7 @@ import warnings
 
 import pandas as pd
 
+from scripts.analysis.generate_html_reports import update_html_reports
 from nusri_project.strategy.phase2_strategy_research import (
     build_scan_profile,
     rank_scan_results,
@@ -30,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--deal-price", default="close")
     parser.add_argument("--scan-profile", default="label72_trade_tuning_fast")
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--update-html", action="store_true")
     return parser.parse_args()
 
 
@@ -74,6 +76,13 @@ def main() -> int:
     print(ranked.head(15).to_string(index=False))
     print("\nTop feasible:")
     print(top_candidates.to_string(index=False))
+
+    if args.update_html:
+        update_html_reports(
+            reports_root=Path("reports"),
+            output_root=Path("reports/html"),
+            experiments=[output_dir.name],
+        )
     return 0
 
 

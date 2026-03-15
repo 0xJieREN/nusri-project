@@ -22,15 +22,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    args = parse_args()
-    reports_root = Path(args.reports_root)
-    output_root = Path(args.output_root)
+def update_html_reports(
+    *,
+    reports_root: Path,
+    output_root: Path,
+    experiments: list[str],
+) -> None:
     output_root.mkdir(parents=True, exist_ok=True)
 
     generated = []
     missing = []
-    for name in args.experiments:
+    for name in experiments:
         experiment_dir = reports_root / name
         if not experiment_dir.exists():
             missing.append(name)
@@ -48,6 +50,15 @@ def main() -> int:
         )
 
     (output_root / "index.html").write_text(build_index_html(generated, missing), encoding="utf-8")
+
+
+def main() -> int:
+    args = parse_args()
+    update_html_reports(
+        reports_root=Path(args.reports_root),
+        output_root=Path(args.output_root),
+        experiments=args.experiments,
+    )
     return 0
 
 

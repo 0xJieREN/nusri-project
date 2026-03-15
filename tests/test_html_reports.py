@@ -12,6 +12,7 @@ from nusri_project.reporting.html_reports import (
     detect_experiment_layout,
     generate_experiment_report,
 )
+from scripts.analysis.generate_html_reports import update_html_reports
 
 
 class HtmlReportsTests(unittest.TestCase):
@@ -89,6 +90,23 @@ class HtmlReportsTests(unittest.TestCase):
         self.assertIn("exp_a", html)
         self.assertIn("年化 10.00% | Sharpe 1.20 | 最大回撤 8.00%", html)
         self.assertIn("exp_missing", html)
+
+    def test_update_html_reports_generates_index_for_requested_experiment(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reports_root = root / "reports"
+            output_root = reports_root / "html"
+            exp = reports_root / "demo_exp"
+            exp.mkdir(parents=True)
+            pd.DataFrame(
+                [{"annualized_return": 0.1, "sharpe": 1.0, "max_drawdown": 0.08}]
+            ).to_csv(exp / "summary.csv", index=False)
+
+            update_html_reports(reports_root=reports_root, output_root=output_root, experiments=["demo_exp"])
+
+            index_html = (output_root / "index.html").read_text()
+            self.assertIn("demo_exp", index_html)
+            self.assertIn("年化 10.00% | Sharpe 1.00 | 最大回撤 8.00%", index_html)
 
 
 if __name__ == "__main__":

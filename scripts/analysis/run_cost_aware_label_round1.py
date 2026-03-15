@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from scripts.analysis.generate_html_reports import update_html_reports
 from nusri_project.strategy.cost_aware_label_round1 import (
     build_cost_aware_round1_matrix,
     build_cost_aware_round1_modes,
@@ -16,6 +17,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--provider-uri", required=True)
     parser.add_argument("--output-root", default="reports/cost_aware_label_round1")
     parser.add_argument("--year", type=int, default=2024)
+    parser.add_argument("--update-html", action="store_true")
     return parser.parse_args()
 
 
@@ -34,6 +36,14 @@ def main() -> int:
         output_root.mkdir(parents=True, exist_ok=True)
         summary.to_csv(output_root / "summary.csv", index=False)
         print(summary.to_string(index=False))
+
+    if args.update_html:
+        output_root = Path(args.output_root)
+        update_html_reports(
+            reports_root=Path("reports"),
+            output_root=Path("reports/html"),
+            experiments=[output_root.name],
+        )
     return 0
 
 

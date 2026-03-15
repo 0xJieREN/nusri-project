@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import warnings
 
+from scripts.analysis.generate_html_reports import update_html_reports
 from nusri_project.strategy.phase2_strategy_research import (
     baseline_summary_row,
     build_scan_profile,
@@ -39,6 +40,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--de-risk-position", type=float, default=0.5)
     parser.add_argument("--scan", action="store_true")
     parser.add_argument("--scan-profile", default="small", choices=("small", "conservative", "conservative_fast"))
+    parser.add_argument("--update-html", action="store_true")
     return parser.parse_args()
 
 
@@ -92,6 +94,13 @@ def main() -> int:
         print(ranked_results.head(10).to_string(index=False))
     else:
         print(baseline_frame.to_string(index=False))
+
+    if args.update_html:
+        update_html_reports(
+            reports_root=Path("reports"),
+            output_root=Path("reports/html"),
+            experiments=[output_dir.name],
+        )
     return 0
 
 
