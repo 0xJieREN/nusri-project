@@ -13,6 +13,7 @@ from nusri_project.config.alpha261_config import get_alpha261_config, get_top23_
 PROVIDER_URI = "./qlib_data/my_crypto_data"
 DEFAULT_FEATURE_SET = "top23"
 DEFAULT_RUN_MODE = "rolling"
+DEFAULT_LABEL_HORIZON_HOURS = 8
 
 market = "all"
 benchmark = "BTCUSDT"
@@ -37,8 +38,20 @@ def get_feature_config(feature_set: str):
     raise ValueError(f"Unknown FEATURE_SET: {feature_set}")
 
 
-def build_conf(feature_set: str = DEFAULT_FEATURE_SET) -> dict:
+def get_label_expr(label_horizon_hours: int) -> str:
+    return f"Ref($close, -{label_horizon_hours}) / $close - 1"
+
+
+def build_label_config(label_horizon_hours: int = DEFAULT_LABEL_HORIZON_HOURS) -> tuple[list[str], list[str]]:
+    return [get_label_expr(label_horizon_hours)], [f"label_{label_horizon_hours}h"]
+
+
+def build_conf(
+    feature_set: str = DEFAULT_FEATURE_SET,
+    label_horizon_hours: int = DEFAULT_LABEL_HORIZON_HOURS,
+) -> dict:
     feature_config = get_feature_config(feature_set)
+    label_config = build_label_config(label_horizon_hours)
     return {
         "task": {
             "model": {
@@ -74,11 +87,8 @@ def build_conf(feature_set: str = DEFAULT_FEATURE_SET) -> dict:
                                 "module_path": "qlib.data.dataset.loader",
                                 "kwargs": {
                                     "config": {
-                                        "feature": feature_config,
-                                        "label": (
-                                            ["Ref($close, -8) / $close - 1"],
-                                            ["label"],
-                                        ),
+                                    "feature": feature_config,
+                                        "label": label_config,
                                     },
                                     "freq": "60min",
                                 },
@@ -266,13 +276,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--feature-set", choices=("alpha261", "top23"), default=DEFAULT_FEATURE_SET)
     parser.add_argument("--run-mode", choices=("single", "rolling"), default=DEFAULT_RUN_MODE)
     parser.add_argument("--provider-uri", default=PROVIDER_URI)
+    parser.add_argument("--label-horizon-hours", type=int, default=DEFAULT_LABEL_HORIZON_HOURS)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     init_qlib(provider_uri=args.provider_uri)
-    workflow_conf = build_conf(feature_set=args.feature_set)
+    workflow_conf = build_conf(
+        feature_set=args.feature_set,
+        label_horizon_hours=args.label_horizon_hours,
+    )
     if args.run_mode == "single":
         run_single(workflow_conf)
     elif args.run_mode == "rolling":
