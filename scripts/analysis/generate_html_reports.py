@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from nusri_project.reporting.html_reports import generate_experiment_report
+from nusri_project.reporting.html_reports import build_index_html, generate_experiment_report
 
 
 DEFAULT_EXPERIMENTS = [
@@ -36,24 +36,18 @@ def main() -> int:
             missing.append(name)
             continue
         html_path = generate_experiment_report(experiment_dir, output_root / name)
-        generated.append((name, html_path))
-
-    index_lines = [
-        "<html><head><meta charset='utf-8'><title>实验报告索引</title></head><body>",
-        "<h1>实验报告索引</h1>",
-        "<ul>",
-    ]
-    for name, html_path in generated:
         rel = html_path.relative_to(output_root)
-        index_lines.append(f"<li><a href='{rel.as_posix()}'>{name}</a></li>")
-    index_lines.append("</ul>")
-    if missing:
-        index_lines.append("<h2>未找到的实验</h2><ul>")
-        for name in missing:
-            index_lines.append(f"<li>{name}</li>")
-        index_lines.append("</ul>")
-    index_lines.append("</body></html>")
-    (output_root / "index.html").write_text("\n".join(index_lines), encoding="utf-8")
+        from nusri_project.reporting.html_reports import _extract_experiment_summary
+
+        generated.append(
+            {
+                "name": name,
+                "href": rel.as_posix(),
+                "summary": _extract_experiment_summary(experiment_dir),
+            }
+        )
+
+    (output_root / "index.html").write_text(build_index_html(generated, missing), encoding="utf-8")
     return 0
 
 

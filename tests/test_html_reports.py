@@ -8,6 +8,7 @@ import unittest
 import pandas as pd
 
 from nusri_project.reporting.html_reports import (
+    build_index_html,
     detect_experiment_layout,
     generate_experiment_report,
 )
@@ -74,6 +75,20 @@ class HtmlReportsTests(unittest.TestCase):
 
             self.assertTrue(html_path.exists())
             self.assertIn("实验汇总", html_path.read_text())
+
+    def test_build_index_html_includes_experiment_summary_lines(self) -> None:
+        generated = [
+            {
+                "name": "exp_a",
+                "href": "exp_a/index.html",
+                "summary": "年化 10.00% | Sharpe 1.20 | 最大回撤 8.00%",
+            }
+        ]
+        html = build_index_html(generated, missing=["exp_missing"])
+
+        self.assertIn("exp_a", html)
+        self.assertIn("年化 10.00% | Sharpe 1.20 | 最大回撤 8.00%", html)
+        self.assertIn("exp_missing", html)
 
 
 if __name__ == "__main__":

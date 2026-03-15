@@ -52,6 +52,64 @@ def _df_to_html_table(df: pd.DataFrame) -> str:
     return df.to_html(index=False, border=0, classes="table")
 
 
+def _format_pct(value: float | None) -> str:
+    if value is None or pd.isna(value):
+        return "N/A"
+    return f"{value * 100:.2f}%"
+
+
+def _extract_experiment_summary(experiment_dir: Path) -> str:
+    summary_json = experiment_dir / "summary.json"
+    summary_csv = experiment_dir / "summary.csv"
+
+    annualized_return = None
+    sharpe = None
+    max_drawdown = None
+
+    if summary_json.exists():
+        data = json.loads(summary_json.read_text())
+        annualized_return = data.get("annualized_return")
+        sharpe = data.get("sharpe")
+        max_drawdown = data.get("max_drawdown")
+    elif summary_csv.exists():
+        df = pd.read_csv(summary_csv)
+        if not df.empty:
+            if "sharpe" in df.columns:
+                best = df.sort_values("sharpe", ascending=False).iloc[0]
+            else:
+                best = df.iloc[0]
+            annualized_return = best.get("annualized_return")
+            sharpe = best.get("sharpe")
+            max_drawdown = best.get("max_drawdown")
+
+    if annualized_return is None and sharpe is None and max_drawdown is None:
+        return "无可提取摘要"
+    sharpe_text = "N/A" if sharpe is None or pd.isna(sharpe) else f"{float(sharpe):.2f}"
+    return f"年化 {_format_pct(annualized_return)} | Sharpe {sharpe_text} | 最大回撤 {_format_pct(max_drawdown)}"
+
+
+def build_index_html(generated: list[dict], missing: list[str]) -> str:
+    lines = [
+        "<html><head><meta charset='utf-8'><title>实验报告索引</title>",
+        "<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:32px;} li{margin:10px 0;} .summary{color:#555;margin-top:4px;}</style>",
+        "</head><body>",
+        "<h1>实验报告索引</h1>",
+        "<ul>",
+    ]
+    for item in generated:
+        lines.append(
+            f"<li><a href='{escape(item['href'])}'>{escape(item['name'])}</a><div class='summary'>{escape(item['summary'])}</div></li>"
+        )
+    lines.append("</ul>")
+    if missing:
+        lines.append("<h2>未找到的实验</h2><ul>")
+        for name in missing:
+            lines.append(f"<li>{escape(name)}</li>")
+        lines.append("</ul>")
+    lines.append("</body></html>")
+    return "\n".join(lines)
+
+
 def _single_run_html(experiment_dir: Path, output_dir: Path) -> Path:
     _ensure_dir(output_dir)
     report = pd.read_csv(experiment_dir / "report.csv", parse_dates=["datetime"]).set_index("datetime")
