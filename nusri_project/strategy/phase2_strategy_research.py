@@ -115,6 +115,37 @@ def build_scan_profile(profile: str) -> list[dict]:
             drawdown_thresholds=[0.02, 0.05],
             de_risk_positions=[0.0, 0.25],
         )
+    if profile == "label72_trade_tuning":
+        threshold_pairs = [
+            (0.0015, 0.003),
+            (0.003, 0.005),
+            (0.005, 0.008),
+            (0.008, 0.012),
+        ]
+        risk_pairs = [
+            (0.02, 0.0),
+            (0.02, 0.10),
+            (0.04, 0.20),
+            (0.06, 0.25),
+        ]
+        candidates: list[dict] = []
+        for entry_threshold, full_position_threshold in threshold_pairs:
+            for max_position in [0.10, 0.15, 0.20, 0.25, 0.35, 0.50]:
+                for min_holding_hours in [48, 72, 96]:
+                    for drawdown_de_risk_threshold, de_risk_position in risk_pairs:
+                        candidates.append(
+                            {
+                                "entry_threshold": entry_threshold,
+                                "exit_threshold": 0.0,
+                                "full_position_threshold": full_position_threshold,
+                                "max_position": max_position,
+                                "min_holding_hours": min_holding_hours,
+                                "cooldown_hours": 12,
+                                "drawdown_de_risk_threshold": drawdown_de_risk_threshold,
+                                "de_risk_position": de_risk_position,
+                            }
+                        )
+        return candidates
     raise ValueError(f"unknown scan profile: {profile}")
 
 
@@ -134,6 +165,22 @@ def rank_scan_results(
         ascending=[False, False, False, False],
     ).reset_index(drop=True)
     return ranked
+
+
+def select_top_feasible_candidates(
+    frame: pd.DataFrame,
+    *,
+    limit: int = 5,
+    min_annualized_return: float = 0.04,
+    max_drawdown: float = 0.10,
+) -> pd.DataFrame:
+    ranked = rank_scan_results(
+        frame,
+        min_annualized_return=min_annualized_return,
+        max_drawdown=max_drawdown,
+    )
+    feasible = ranked[ranked["meets_constraints"]].copy()
+    return feasible.head(limit).reset_index(drop=True)
 
 
 def write_backtest_outputs(

@@ -11,6 +11,7 @@ from nusri_project.strategy.phase2_strategy_research import (
     build_parameter_grid,
     find_prediction_files,
     rank_scan_results,
+    select_top_feasible_candidates,
 )
 
 
@@ -120,6 +121,28 @@ class Phase2StrategyResearchTests(unittest.TestCase):
 
         self.assertTrue(0 < len(grid) <= 32)
         self.assertTrue(all(candidate["max_position"] <= 0.35 for candidate in grid))
+
+    def test_build_scan_profile_label72_trade_tuning_uses_targeted_ranges(self) -> None:
+        grid = build_scan_profile("label72_trade_tuning")
+
+        self.assertTrue(0 < len(grid) <= 512)
+        self.assertTrue(all(candidate["entry_threshold"] in {0.0015, 0.003, 0.005, 0.008} for candidate in grid))
+        self.assertTrue(all(candidate["max_position"] in {0.10, 0.15, 0.20, 0.25, 0.35, 0.50} for candidate in grid))
+        self.assertTrue(all(candidate["min_holding_hours"] in {48, 72, 96} for candidate in grid))
+
+    def test_select_top_feasible_candidates_prefers_sharpe_then_return(self) -> None:
+        frame = pd.DataFrame(
+            [
+                {"candidate_id": "a", "annualized_return": 0.05, "max_drawdown": 0.08, "sharpe": 1.0, "calmar": 0.7},
+                {"candidate_id": "b", "annualized_return": 0.07, "max_drawdown": 0.09, "sharpe": 1.2, "calmar": 0.8},
+                {"candidate_id": "c", "annualized_return": 0.06, "max_drawdown": 0.11, "sharpe": 2.0, "calmar": 1.0},
+                {"candidate_id": "d", "annualized_return": 0.09, "max_drawdown": 0.07, "sharpe": 1.2, "calmar": 0.9},
+            ]
+        )
+
+        selected = select_top_feasible_candidates(frame, limit=2)
+
+        self.assertEqual(list(selected["candidate_id"]), ["d", "b"])
 
 
 if __name__ == "__main__":
