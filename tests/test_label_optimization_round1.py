@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
-from nusri_project.training.lgbm_workflow import build_label_config, get_label_expr
+from nusri_project.training.lgbm_workflow import (
+    build_label_config,
+    build_prediction_artifact_name,
+    get_label_expr,
+)
 from nusri_project.strategy.label_optimization_round1 import (
     build_round1_horizons,
+    build_round1_run_plan,
     build_round1_trading_shells,
     build_round1_matrix,
+    find_horizon_prediction_files,
 )
 
 
@@ -44,6 +52,34 @@ class LabelOptimizationRound1Tests(unittest.TestCase):
             matrix[-1],
             {"label_horizon_hours": 72, "shell_name": "conservative"},
         )
+
+    def test_build_prediction_artifact_name_encodes_horizon_and_month(self) -> None:
+        self.assertEqual(build_prediction_artifact_name(24, "2024-03"), "pred_24h_202403.pkl")
+        self.assertEqual(build_prediction_artifact_name(72, "2025-12"), "pred_72h_202512.pkl")
+
+    def test_build_round1_run_plan_creates_horizon_specific_prediction_dirs(self) -> None:
+        plan = build_round1_run_plan(Path("reports/label_round1"))
+
+        self.assertEqual(len(plan), 6)
+        self.assertEqual(plan[0]["label_horizon_hours"], 24)
+        self.assertEqual(plan[0]["shell_name"], "balanced")
+        self.assertEqual(plan[0]["prediction_dir"], Path("reports/label_round1/predictions/24h"))
+        self.assertEqual(plan[-1]["prediction_dir"], Path("reports/label_round1/predictions/72h"))
+
+    def test_find_horizon_prediction_files_filters_by_horizon_and_year(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in (
+                "pred_24h_202401.pkl",
+                "pred_24h_202402.pkl",
+                "pred_48h_202401.pkl",
+                "pred_24h_202501.pkl",
+            ):
+                (root / name).write_text("x")
+
+            files = find_horizon_prediction_files(root, label_horizon_hours=24, year=2024)
+
+        self.assertEqual([path.name for path in files], ["pred_24h_202401.pkl", "pred_24h_202402.pkl"])
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import argparse
 from copy import deepcopy
 from datetime import datetime
+from pathlib import Path
 from typing import cast
 
 import pandas as pd
@@ -44,6 +45,10 @@ def get_label_expr(label_horizon_hours: int) -> str:
 
 def build_label_config(label_horizon_hours: int = DEFAULT_LABEL_HORIZON_HOURS) -> tuple[list[str], list[str]]:
     return [get_label_expr(label_horizon_hours)], [f"label_{label_horizon_hours}h"]
+
+
+def build_prediction_artifact_name(label_horizon_hours: int, month_label: str) -> str:
+    return f"pred_{label_horizon_hours}h_{month_label.replace('-', '')}.pkl"
 
 
 def build_conf(
@@ -221,13 +226,21 @@ def run_single(workflow_conf: dict | None = None):
         recorder.save_objects(**{"pred_test.pkl": test_pred})
 
 
-def run_rolling_monthly(workflow_conf: dict | None = None):
+def run_rolling_monthly(
+    workflow_conf: dict | None = None,
+    *,
+    label_horizon_hours: int = DEFAULT_LABEL_HORIZON_HOURS,
+    prediction_output_dir: str | None = None,
+):
     workflow_conf = conf if workflow_conf is None else workflow_conf
     start_ts = pd.Timestamp(ROLLING_START)
     end_ts = pd.Timestamp(ROLLING_END)
     data_start_ts = pd.Timestamp(DATA_START_TIME)
 
     yearly_results: dict[str, list[pd.DataFrame]] = {}
+    pred_output_path = None if prediction_output_dir is None else Path(prediction_output_dir)
+    if pred_output_path is not None:
+        pred_output_path.mkdir(parents=True, exist_ok=True)
 
     for month_start in pd.date_range(start=start_ts, end=end_ts, freq="MS"):
         next_month_start = month_start + pd.DateOffset(months=1)
@@ -265,6 +278,9 @@ def run_rolling_monthly(workflow_conf: dict | None = None):
 
             test_pred = _make_predictions(dataset, model, "test")
             yearly_results.setdefault(year_key, []).append(test_pred)
+            if pred_output_path is not None:
+                output_name = build_prediction_artifact_name(label_horizon_hours, label_name)
+                test_pred.to_pickle(pred_output_path / output_name)
 
     for year_key in sorted(yearly_results.keys()):
         yearly_pred = pd.concat(yearly_results[year_key]).sort_index()
@@ -277,6 +293,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-mode", choices=("single", "rolling"), default=DEFAULT_RUN_MODE)
     parser.add_argument("--provider-uri", default=PROVIDER_URI)
     parser.add_argument("--label-horizon-hours", type=int, default=DEFAULT_LABEL_HORIZON_HOURS)
+    parser.add_argument("--prediction-output-dir", default=None)
     return parser.parse_args()
 
 
@@ -290,7 +307,11 @@ def main() -> int:
     if args.run_mode == "single":
         run_single(workflow_conf)
     elif args.run_mode == "rolling":
-        run_rolling_monthly(workflow_conf)
+        run_rolling_monthly(
+            workflow_conf,
+            label_horizon_hours=args.label_horizon_hours,
+            prediction_output_dir=args.prediction_output_dir,
+        )
     else:
         raise ValueError(f"Unknown RUN_MODE: {args.run_mode}")
     return 0
