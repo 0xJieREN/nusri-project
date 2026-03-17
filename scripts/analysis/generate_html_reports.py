@@ -7,6 +7,8 @@ from nusri_project.reporting.html_reports import build_index_html, generate_expe
 
 
 DEFAULT_EXPERIMENTS = [
+    "regression-2024",
+    "regression-2025",
     "costaware-2024",
     "costaware-2025",
 ]
