@@ -1,10 +1,16 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance when working with code in this repository.
 
 ## Project Overview
 
-Python 3.12 cryptocurrency price prediction project using QLib framework and LightGBM for BTCUSDT trading. Script-driven workflow (not a standard Python package).
+Python 3.12 cryptocurrency research repository using QLib and LightGBM for BTCUSDT trading research.
+
+The current direction is a config-driven workflow:
+
+- `config.toml` is the research configuration source of truth
+- return-signal trading and probability-signal trading are separated
+- QLib-first training and backtesting remain the execution backbone
 
 ## Environment
 
@@ -25,17 +31,17 @@ uv run python -m scripts.data.clean_data --input data/raw/BTCUSDT_1h_binance_dat
 # QLib source CSV → QLib binary
 uv run python -m scripts.data.dump_bin dump_all --data_path qlib_source_data --qlib_dir qlib_data/my_crypto_data --freq 60min
 
-# Train LightGBM model (single or rolling mode)
-uv run python -m scripts.training.lgbm_workflow
+# Train via config
+uv run python -m scripts.training.lgbm_workflow --config config.toml --experiment-profile cost_aware_main
 
-# Export feature importance
-uv run python -m scripts.analysis.dump_lgbm_feature_importance --importance-type gain --out reports/feature_importance/lgbm_feature_importance.csv --top 20
+# Backtest via config
+uv run python -m scripts.analysis.backtest_spot_strategy --pred-glob "/absolute/path/to/pred_*.pkl" --config config.toml --experiment-profile cost_aware_main
 
-# Run spot backtest
-uv run python -m scripts.analysis.backtest_spot_strategy --pred-glob "/absolute/path/to/pred_2024*.pkl" --provider-uri ./qlib_data/my_crypto_data
+# Run cost-aware comparison
+uv run python -m scripts.analysis.run_cost_aware_label_round1 --predictions-root reports/cost_aware_label_round1/predictions --config config.toml --experiment-profile cost_aware_main --year 2025
 
-# Run phase 2 baseline / scan
-uv run python -m scripts.analysis.run_phase2_baseline --mlruns-root ./mlruns --provider-uri ./qlib_data/my_crypto_data --year 2024 --scan
+# Run label optimization round1
+uv run python -m scripts.analysis.run_label_optimization_round1 --predictions-root reports/label_optimization_round1/predictions --config config.toml --experiment-profile regression_72h_main --year 2024
 ```
 
 ## Architecture
@@ -57,9 +63,12 @@ nusri_project/strategy/*                  → Strategy and scan helpers
 - `nusri_project/strategy/phase2_strategy_research.py` — phase 2 scan helpers
 - `qlib_data/my_crypto_data/` — QLib binary data directory
 
-**Configurable options in `nusri_project/training/lgbm_workflow.py`:**
-- `FEATURE_SET`: "alpha261" or "top23"
-- `RUN_MODE`: "single" or "rolling"
+**Primary config source:**
+- `config.toml`
+
+**Important strategy split:**
+- Return mode emits `pred_return` and uses return thresholds
+- Classification mode emits `pred_prob` and uses probability thresholds
 
 ## Data Paths
 
@@ -75,5 +84,6 @@ nusri_project/strategy/*                  → Strategy and scan helpers
 - High-frequency time format: `%Y-%m-%d %H:%M:%S`
 - Alpha261 factor names must be unique (raises `ValueError` on duplicates)
 - Do not commit: `qlib_data/`, `mlruns/`, large CSV files (see `.gitignore`)
+- `nusri_project/strategy/strategy_config.py` is now a runtime transport/compatibility layer, not the source of truth for research defaults
 - Before writing custom backtest or portfolio-analysis code, check whether QLib already provides the needed capability through `qlib.backtest.backtest`, `qlib.contrib.evaluate.backtest_daily`, or `qlib.workflow.record_temp.PortAnaRecord`
 - If QLib has a suitable built-in path, prefer configuring and integrating it over maintaining a parallel handwritten backtest stack

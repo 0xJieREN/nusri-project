@@ -3,7 +3,7 @@
 本仓库是 Python 3.12 的加密货币价格预测项目：
 - QLib：数据处理 / 特征工程 / 数据集抽象
 - LightGBM：通过 QLib `LGBModel` 训练
-- 以脚本驱动为主（顶层脚本较多，非标准包结构）
+- 当前主线正在迁移到 `config.toml` 驱动的研究工作流
 
 规则来源检查结果：
 - 未发现 Cursor 规则：`.cursor/rules/`、`.cursorrules`
@@ -56,17 +56,29 @@
 - `scripts/data/dump_bin.py` 使用 `fire` CLI
 - 输出目录包含 `calendars/ features/ instruments/ ...`
 
-### 2.4 训练 LightGBM（主流程）
+### 2.4 训练 LightGBM（配置驱动主流程）
+
+- `uv run python -m scripts.training.lgbm_workflow --config config.toml --experiment-profile cost_aware_main`
+
+兼容旧参数模式：
 
 - `uv run python -m scripts.training.lgbm_workflow`
 
 要点：
-- `provider_uri = ./qlib_data/my_crypto_data`
-- 训练/验证/测试区间通过 `segments` 配置
+- 新主线优先从 `config.toml` 读取 profile
+- 旧参数模式仍保留，但不再是研究默认值真源
 
 ### 2.5 导出特征重要性
 
 - `uv run python -m scripts.analysis.dump_lgbm_feature_importance --importance-type gain --out reports/feature_importance/lgbm_feature_importance.csv --top 20`
+
+### 2.6 运行配置驱动回测 / 扫描
+
+- `uv run python -m scripts.analysis.backtest_spot_strategy --pred-glob "/absolute/path/to/pred_*.pkl" --config config.toml --experiment-profile cost_aware_main`
+- `uv run python -m scripts.analysis.run_phase2_baseline --mlruns-root ./mlruns --config config.toml --experiment-profile regression_72h_main --year 2024 --scan`
+- `uv run python -m scripts.analysis.run_72h_trade_tuning --predictions-root reports/label_optimization_round1/predictions --config config.toml --experiment-profile regression_72h_main --year 2024`
+- `uv run python -m scripts.analysis.run_cost_aware_label_round1 --predictions-root reports/cost_aware_label_round1/predictions --config config.toml --experiment-profile cost_aware_main --year 2025`
+- `uv run python -m scripts.analysis.run_label_optimization_round1 --predictions-root reports/label_optimization_round1/predictions --config config.toml --experiment-profile regression_72h_main --year 2024`
 
 ---
 
@@ -150,7 +162,11 @@
 
 - 默认 QLib 数据目录：`./qlib_data/my_crypto_data`
 - 高频时间格式：`%Y-%m-%d %H:%M:%S`
+- 研究配置真源：`./config.toml`
 - `nusri_project/config/alpha261_config.py` 因子名必须唯一（重复会 `raise ValueError("duplicate factor name")`）
+- 分类标签输出列使用 `pred_prob`；回归标签输出列使用 `pred_return`
+- 分类交易层比较概率阈值：`enter_prob_threshold / exit_prob_threshold / full_prob_threshold`
+- 回归交易层比较收益阈值：`entry_threshold / exit_threshold / full_position_threshold`
 - 涉及策略回测、执行器、交易成本、组合分析时，先检查 `Qlib` 官方现成能力是否已覆盖，例如 `qlib.backtest.backtest`、`qlib.contrib.evaluate.backtest_daily`、`qlib.workflow.record_temp.PortAnaRecord`
 - 如果 `Qlib` 已有合适能力，优先通过配置、封装和对接现有接口实现；不要先手写一套平行回测框架
 - 只有在 `Qlib` 现成接口无法准确表达当前需求时，才允许补充自定义实现；并在代码或文档中明确说明缺口

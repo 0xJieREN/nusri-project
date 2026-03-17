@@ -1,6 +1,12 @@
-# NUSRI Project
+# nusri-project
 
-Python 3.12 cryptocurrency research repository built around QLib and LightGBM for BTCUSDT hourly prediction, signal evaluation, and spot strategy backtesting.
+Python 3.12 cryptocurrency research repository built around QLib and LightGBM for BTCUSDT prediction, signal evaluation, and spot strategy backtesting.
+
+The repository is moving to a config-driven workflow centered on:
+
+- `config.toml` as the single source of truth for research profiles
+- explicit separation between return-signal trading and probability-signal trading
+- QLib-first training and backtesting entrypoints
 
 ## Structure
 
@@ -12,9 +18,10 @@ Python 3.12 cryptocurrency research repository built around QLib and LightGBM fo
 
 ### Reusable logic
 
-- `nusri_project/config/` — factor and workflow config
+- `config.toml` — single source of truth for experiment profiles
+- `nusri_project/config/` — factor config, runtime config schemas, and loaders
 - `nusri_project/training/` — training workflow logic
-- `nusri_project/strategy/` — spot strategy, backtest wrapper, and phase 2 scan helpers
+- `nusri_project/strategy/` — return strategy, probability strategy, backtest wrapper, and scan helpers
 
 ### Data and outputs
 
@@ -48,7 +55,13 @@ uv run python -m scripts.data.clean_data --input data/raw/BTCUSDT_1h_binance_dat
 uv run python -m scripts.data.dump_bin dump_all --data_path qlib_source_data --qlib_dir qlib_data/my_crypto_data --freq 60min
 ```
 
-### Train LightGBM workflow
+### Train from config
+
+```bash
+uv run python -m scripts.training.lgbm_workflow --config config.toml --experiment-profile cost_aware_main
+```
+
+### Train LightGBM workflow with legacy explicit flags
 
 ```bash
 uv run python -m scripts.training.lgbm_workflow
@@ -66,20 +79,40 @@ uv run python -m scripts.training.lgbm_workflow --feature-set top23 --run-mode r
 uv run python -m scripts.analysis.dump_lgbm_feature_importance --importance-type gain --out reports/feature_importance/lgbm_feature_importance.csv --top 20
 ```
 
-### Run spot backtest on saved prediction files
+### Run spot backtest on saved prediction files via config
 
 ```bash
-uv run python -m scripts.analysis.backtest_spot_strategy --pred-glob "/absolute/path/to/pred_2024*.pkl" --provider-uri ./qlib_data/my_crypto_data
+uv run python -m scripts.analysis.backtest_spot_strategy --pred-glob "/absolute/path/to/pred_2024*.pkl" --config config.toml --experiment-profile regression_72h_main
+```
+
+### Run cost-aware round1 comparison
+
+```bash
+uv run python -m scripts.analysis.run_cost_aware_label_round1 --predictions-root reports/cost_aware_label_round1/predictions --config config.toml --experiment-profile cost_aware_main --year 2025 --update-html
+```
+
+### Run label optimization round1
+
+```bash
+uv run python -m scripts.analysis.run_label_optimization_round1 --predictions-root reports/label_optimization_round1/predictions --config config.toml --experiment-profile regression_72h_main --year 2024 --update-html
+```
+
+### Run 72h trade tuning
+
+```bash
+uv run python -m scripts.analysis.run_72h_trade_tuning --predictions-root reports/label_optimization_round1/predictions --config config.toml --experiment-profile regression_72h_main --year 2024 --update-html
 ```
 
 ### Run phase 2 baseline and parameter scan
 
 ```bash
-uv run python -m scripts.analysis.run_phase2_baseline --mlruns-root ./mlruns --provider-uri ./qlib_data/my_crypto_data --year 2024 --scan
+uv run python -m scripts.analysis.run_phase2_baseline --mlruns-root ./mlruns --config config.toml --experiment-profile regression_72h_main --year 2024 --scan --update-html
 ```
 
 ## Notes
 
 - QLib binary data must exist before training or backtesting.
 - Spot backtests now use a QLib-first implementation with a custom single-asset order generator for fractional crypto sizing.
+- Classification trading now uses `pred_prob` directly instead of mapping probability into pseudo-return.
+- Return-signal strategies and probability-signal strategies are now explicitly separated.
 - Generated reports and temporary research outputs should not be committed unless explicitly needed.
