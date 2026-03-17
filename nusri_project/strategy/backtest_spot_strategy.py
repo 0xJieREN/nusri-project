@@ -11,7 +11,9 @@ import qlib
 from qlib.backtest import backtest as qlib_backtest
 from qlib.constant import REG_CN
 
+from nusri_project.config.runtime_config import load_runtime_config
 from nusri_project.strategy.strategy_config import SpotStrategyConfig
+from nusri_project.strategy.strategy_config import build_spot_strategy_config_from_runtime
 
 
 def normalize_prediction_frame(frame: pd.DataFrame, *, signal_column: str = "pred_return") -> pd.DataFrame:
@@ -252,7 +254,7 @@ def _expand_prediction_globs(patterns: list[str]) -> list[Path]:
     return unique_paths
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run a Qlib-first fee-aware BTCUSDT spot long/flat backtest on prediction files."
     )
@@ -262,7 +264,9 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Glob pattern for prediction pickle files. Repeat the flag for multiple patterns.",
     )
-    parser.add_argument("--provider-uri", default="./qlib_data/my_crypto_data")
+    parser.add_argument("--config", default=None)
+    parser.add_argument("--experiment-profile", default=None)
+    parser.add_argument("--provider-uri", default=None)
     parser.add_argument("--instrument", default="BTCUSDT")
     parser.add_argument("--start-time", default="2024-01-01 00:00:00")
     parser.add_argument("--end-time", default="2024-12-31 23:00:00")
@@ -284,35 +288,46 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-position", type=float, default=1.0)
     parser.add_argument("--drawdown-de-risk-threshold", type=float, default=0.08)
     parser.add_argument("--de-risk-position", type=float, default=0.5)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def main() -> int:
     args = parse_args()
-    config = SpotStrategyConfig(
-        provider_uri=args.provider_uri,
-        instrument=args.instrument,
-        start_time=args.start_time,
-        end_time=args.end_time,
-        freq=args.freq,
-        initial_cash=args.initial_cash,
-        fee_rate=args.fee_rate,
-        min_cost=args.min_cost,
-        deal_price=args.deal_price,
-        entry_threshold=args.entry_threshold,
-        exit_threshold=args.exit_threshold,
-        full_position_threshold=args.full_position_threshold,
-        min_holding_hours=args.min_holding_hours,
-        cooldown_hours=args.cooldown_hours,
-        max_position=args.max_position,
-        drawdown_de_risk_threshold=args.drawdown_de_risk_threshold,
-        de_risk_position=args.de_risk_position,
-    )
+    if args.config is not None:
+        runtime = load_runtime_config(args.config, experiment_name=args.experiment_profile)
+        config = build_spot_strategy_config_from_runtime(
+            runtime,
+            start_time=args.start_time,
+            end_time=args.end_time,
+        )
+    else:
+        if args.provider_uri is None:
+            raise ValueError("--provider-uri is required when --config is not provided")
+        config = SpotStrategyConfig(
+            provider_uri=args.provider_uri,
+            instrument=args.instrument,
+            start_time=args.start_time,
+            end_time=args.end_time,
+            freq=args.freq,
+            initial_cash=args.initial_cash,
+            fee_rate=args.fee_rate,
+            min_cost=args.min_cost,
+            deal_price=args.deal_price,
+            entry_threshold=args.entry_threshold,
+            exit_threshold=args.exit_threshold,
+            full_position_threshold=args.full_position_threshold,
+            min_holding_hours=args.min_holding_hours,
+            cooldown_hours=args.cooldown_hours,
+            max_position=args.max_position,
+            drawdown_de_risk_threshold=args.drawdown_de_risk_threshold,
+            de_risk_position=args.de_risk_position,
+        )
     config.validate()
 
     prediction_paths = _expand_prediction_globs(args.pred_glob)
-    combined = load_prediction_frames(prediction_paths)
-    signal = prepare_signal_frame(combined, instrument=config.instrument)
+    signal_column = "pred_prob" if config.signal_kind == "probability" else "pred_return"
+    combined = load_prediction_frames(prediction_paths, signal_column=signal_column)
+    signal = prepare_signal_frame(combined, instrument=config.instrument, signal_column=signal_column)
     report, positions, indicators = run_qlib_backtest(signal, config)
     summary = summarize_report(report, annualization_periods=config.annualization_periods)
     monthly = compute_monthly_returns(report)

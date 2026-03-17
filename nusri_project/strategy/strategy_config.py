@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import warnings
 
+from nusri_project.config.schemas import ExperimentRuntimeConfig
+
 
 @dataclass(frozen=True)
 class SpotStrategyConfig:
@@ -64,3 +66,37 @@ class SpotStrategyConfig:
             raise ValueError("de_risk_position must be in [0, max_position]")
         if abs(self.de_risk_position - self.max_position) <= 1e-12:
             warnings.warn("de_risk_position equals max_position; de-risking will not reduce exposure", stacklevel=2)
+
+
+def build_spot_strategy_config_from_runtime(
+    runtime: ExperimentRuntimeConfig,
+    *,
+    start_time: str | None = None,
+    end_time: str | None = None,
+) -> SpotStrategyConfig:
+    trade = runtime.trade
+    config = SpotStrategyConfig(
+        provider_uri=runtime.data.provider_uri,
+        instrument=runtime.data.instrument,
+        start_time=start_time or runtime.data.start_time,
+        end_time=end_time or runtime.data.end_time,
+        freq=runtime.data.freq,
+        initial_cash=runtime.data.initial_cash,
+        fee_rate=runtime.data.fee_rate,
+        min_cost=runtime.data.min_cost,
+        deal_price=runtime.data.deal_price,
+        signal_kind=trade.signal_kind,
+        entry_threshold=float(trade.entry_threshold or 0.0),
+        exit_threshold=float(trade.exit_threshold or 0.0),
+        full_position_threshold=float(trade.full_position_threshold or 0.0),
+        enter_prob_threshold=trade.enter_prob_threshold,
+        exit_prob_threshold=trade.exit_prob_threshold,
+        full_prob_threshold=trade.full_prob_threshold,
+        min_holding_hours=trade.min_holding_hours,
+        cooldown_hours=trade.cooldown_hours,
+        max_position=trade.max_position,
+        drawdown_de_risk_threshold=trade.drawdown_de_risk_threshold,
+        de_risk_position=trade.de_risk_position,
+    )
+    config.validate()
+    return config

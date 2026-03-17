@@ -4,6 +4,11 @@ import argparse
 from pathlib import Path
 import warnings
 
+from nusri_project.config.runtime_config import load_runtime_config
+from nusri_project.strategy.strategy_config import (
+    SpotStrategyConfig,
+    build_spot_strategy_config_from_runtime,
+)
 from scripts.analysis.generate_html_reports import update_html_reports
 from nusri_project.strategy.phase2_strategy_research import (
     baseline_summary_row,
@@ -13,15 +18,16 @@ from nusri_project.strategy.phase2_strategy_research import (
     run_parameter_scan,
     run_strategy_config,
 )
-from nusri_project.strategy.strategy_config import SpotStrategyConfig
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the 2024 BTCUSDT spot baseline and a small Qlib-first parameter scan."
     )
     parser.add_argument("--mlruns-root", required=True)
-    parser.add_argument("--provider-uri", required=True)
+    parser.add_argument("--provider-uri", default=None)
+    parser.add_argument("--config", default=None)
+    parser.add_argument("--experiment-profile", default=None)
     parser.add_argument("--year", type=int, default=2024)
     parser.add_argument("--instrument", default="BTCUSDT")
     parser.add_argument("--output-dir", default="reports/phase2_2024")
@@ -41,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--scan", action="store_true")
     parser.add_argument("--scan-profile", default="small", choices=("small", "conservative", "conservative_fast"))
     parser.add_argument("--update-html", action="store_true")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def main() -> int:
@@ -53,25 +59,35 @@ def main() -> int:
 
     start_time = f"{args.year}-01-01 00:00:00"
     end_time = f"{args.year}-12-31 23:00:00"
-    config = SpotStrategyConfig(
-        provider_uri=args.provider_uri,
-        instrument=args.instrument,
-        start_time=start_time,
-        end_time=end_time,
-        freq=args.freq,
-        initial_cash=args.initial_cash,
-        fee_rate=args.fee_rate,
-        min_cost=args.min_cost,
-        deal_price=args.deal_price,
-        entry_threshold=args.entry_threshold,
-        exit_threshold=args.exit_threshold,
-        full_position_threshold=args.full_position_threshold,
-        min_holding_hours=args.min_holding_hours,
-        cooldown_hours=args.cooldown_hours,
-        max_position=args.max_position,
-        drawdown_de_risk_threshold=args.drawdown_de_risk_threshold,
-        de_risk_position=args.de_risk_position,
-    )
+    if args.config is not None:
+        runtime = load_runtime_config(args.config, experiment_name=args.experiment_profile)
+        config = build_spot_strategy_config_from_runtime(
+            runtime,
+            start_time=start_time,
+            end_time=end_time,
+        )
+    else:
+        if args.provider_uri is None:
+            raise ValueError("--provider-uri is required when --config is not provided")
+        config = SpotStrategyConfig(
+            provider_uri=args.provider_uri,
+            instrument=args.instrument,
+            start_time=start_time,
+            end_time=end_time,
+            freq=args.freq,
+            initial_cash=args.initial_cash,
+            fee_rate=args.fee_rate,
+            min_cost=args.min_cost,
+            deal_price=args.deal_price,
+            entry_threshold=args.entry_threshold,
+            exit_threshold=args.exit_threshold,
+            full_position_threshold=args.full_position_threshold,
+            min_holding_hours=args.min_holding_hours,
+            cooldown_hours=args.cooldown_hours,
+            max_position=args.max_position,
+            drawdown_de_risk_threshold=args.drawdown_de_risk_threshold,
+            de_risk_position=args.de_risk_position,
+        )
     config.validate()
 
     output_dir = Path(args.output_dir)
