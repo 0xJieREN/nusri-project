@@ -14,11 +14,8 @@ from qlib.constant import REG_CN
 from nusri_project.strategy.strategy_config import SpotStrategyConfig
 
 
-REQUIRED_COLUMNS = ["pred_return"]
-
-
-def normalize_prediction_frame(frame: pd.DataFrame) -> pd.DataFrame:
-    missing = [column for column in REQUIRED_COLUMNS if column not in frame.columns]
+def normalize_prediction_frame(frame: pd.DataFrame, *, signal_column: str = "pred_return") -> pd.DataFrame:
+    missing = [column for column in [signal_column] if column not in frame.columns]
     if missing:
         raise ValueError(f"prediction frame missing required columns: {missing}")
 
@@ -34,8 +31,8 @@ def normalize_prediction_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return normalized
 
 
-def load_prediction_frames(paths: Iterable[Path]) -> pd.DataFrame:
-    normalized_frames = [normalize_prediction_frame(pd.read_pickle(path)) for path in paths]
+def load_prediction_frames(paths: Iterable[Path], *, signal_column: str = "pred_return") -> pd.DataFrame:
+    normalized_frames = [normalize_prediction_frame(pd.read_pickle(path), signal_column=signal_column) for path in paths]
     if not normalized_frames:
         raise ValueError("no prediction files were provided")
 
@@ -45,8 +42,8 @@ def load_prediction_frames(paths: Iterable[Path]) -> pd.DataFrame:
     return combined
 
 
-def prepare_signal_frame(frame: pd.DataFrame, instrument: str) -> pd.DataFrame:
-    signal = frame.loc[:, ["pred_return"]].rename(columns={"pred_return": "score"}).copy()
+def prepare_signal_frame(frame: pd.DataFrame, instrument: str, *, signal_column: str = "pred_return") -> pd.DataFrame:
+    signal = frame.loc[:, [signal_column]].rename(columns={signal_column: "score"}).copy()
     signal["instrument"] = instrument
     signal.index.name = "datetime"
     signal = signal.reset_index().set_index(["instrument", "datetime"]).sort_index()
@@ -85,24 +82,44 @@ def build_backtest_components(
         start_time=config.start_time,
         end_time=config.end_time,
     )
-    strategy_config = {
-        "class": "QlibLongFlatStrategy",
-        "module_path": "nusri_project.strategy.qlib_spot_strategy",
-        "kwargs": {
-            "signal": signal,
-            "instrument": config.instrument,
-            "time_per_step": config.freq,
-            "entry_threshold": config.entry_threshold,
-            "exit_threshold": config.exit_threshold,
-            "full_position_threshold": config.full_position_threshold,
-            "min_holding_hours": config.min_holding_hours,
-            "cooldown_hours": config.cooldown_hours,
-            "max_position": config.max_position,
-            "drawdown_de_risk_threshold": config.drawdown_de_risk_threshold,
-            "de_risk_position": config.de_risk_position,
-            "risk_degree": 1.0,
-        },
-    }
+    if config.signal_kind == "probability":
+        strategy_config = {
+            "class": "QlibProbabilityLongFlatStrategy",
+            "module_path": "nusri_project.strategy.probability_signal_strategy",
+            "kwargs": {
+                "signal": signal,
+                "instrument": config.instrument,
+                "time_per_step": config.freq,
+                "enter_prob_threshold": config.enter_prob_threshold,
+                "exit_prob_threshold": config.exit_prob_threshold,
+                "full_prob_threshold": config.full_prob_threshold,
+                "min_holding_hours": config.min_holding_hours,
+                "cooldown_hours": config.cooldown_hours,
+                "max_position": config.max_position,
+                "drawdown_de_risk_threshold": config.drawdown_de_risk_threshold,
+                "de_risk_position": config.de_risk_position,
+                "risk_degree": 1.0,
+            },
+        }
+    else:
+        strategy_config = {
+            "class": "QlibReturnLongFlatStrategy",
+            "module_path": "nusri_project.strategy.return_signal_strategy",
+            "kwargs": {
+                "signal": signal,
+                "instrument": config.instrument,
+                "time_per_step": config.freq,
+                "entry_threshold": config.entry_threshold,
+                "exit_threshold": config.exit_threshold,
+                "full_position_threshold": config.full_position_threshold,
+                "min_holding_hours": config.min_holding_hours,
+                "cooldown_hours": config.cooldown_hours,
+                "max_position": config.max_position,
+                "drawdown_de_risk_threshold": config.drawdown_de_risk_threshold,
+                "de_risk_position": config.de_risk_position,
+                "risk_degree": 1.0,
+            },
+        }
     executor_config = {
         "class": "SimulatorExecutor",
         "module_path": "qlib.backtest.executor",

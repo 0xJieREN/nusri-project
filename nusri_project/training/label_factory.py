@@ -32,6 +32,14 @@ def build_label_mode_config(
     raise ValueError(f"Unknown label_mode: {label_mode}")
 
 
+def get_prediction_output_column(label_mode: str) -> str:
+    if label_mode.startswith("regression"):
+        return "pred_return"
+    if label_mode == "classification_72h_costaware":
+        return "pred_prob"
+    raise ValueError(f"Unknown label_mode: {label_mode}")
+
+
 def get_label_mode_from_config(label: LabelConfig) -> str:
     if label.kind == "regression":
         return f"regression_{label.horizon_hours}h"

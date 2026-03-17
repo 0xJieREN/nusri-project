@@ -12,11 +12,12 @@ from nusri_project.training.lgbm_workflow import (
     get_cost_aware_binary_label_expr,
     get_label_expr,
     get_model_loss,
-    transform_prediction_score,
 )
+from nusri_project.training.label_factory import get_prediction_output_column
 from nusri_project.strategy.label_optimization_round1 import (
     build_round1_horizons,
     build_round1_run_plan,
+    build_round1_probability_shells,
     build_round1_trading_shells,
     build_round1_matrix,
     find_horizon_prediction_files,
@@ -89,25 +90,9 @@ class LabelOptimizationRound1Tests(unittest.TestCase):
     def test_get_backtest_target_expr_always_returns_continuous_future_return(self) -> None:
         self.assertEqual(get_backtest_target_expr(72), "Ref($close, -72) / $close - 1")
 
-    def test_transform_prediction_score_centers_binary_probability_to_threshold_scale(self) -> None:
-        self.assertAlmostEqual(
-            transform_prediction_score(
-                raw_prediction=0.8,
-                label_mode="classification_72h_costaware",
-                positive_threshold=0.005,
-            ),
-            0.003,
-            places=9,
-        )
-        self.assertAlmostEqual(
-            transform_prediction_score(
-                raw_prediction=0.2,
-                label_mode="classification_72h_costaware",
-                positive_threshold=0.005,
-            ),
-            -0.003,
-            places=9,
-        )
+    def test_get_prediction_output_column_uses_pred_prob_for_costaware_classification(self) -> None:
+        self.assertEqual(get_prediction_output_column("regression_72h"), "pred_return")
+        self.assertEqual(get_prediction_output_column("classification_72h_costaware"), "pred_prob")
 
     def test_build_prediction_artifact_name_can_encode_label_mode(self) -> None:
         self.assertEqual(
@@ -141,6 +126,16 @@ class LabelOptimizationRound1Tests(unittest.TestCase):
 
     def test_cost_aware_round1_modes_are_fixed_to_regression_and_binary(self) -> None:
         self.assertEqual(build_cost_aware_round1_modes(), ["regression_72h", "classification_72h_costaware"])
+
+    def test_round1_probability_shells_define_balanced_and_conservative_profiles(self) -> None:
+        shells = build_round1_probability_shells()
+
+        self.assertEqual(set(shells.keys()), {"balanced", "conservative"})
+        self.assertEqual(shells["balanced"]["signal_kind"], "probability")
+        self.assertEqual(shells["balanced"]["max_position"], 0.25)
+        self.assertEqual(shells["conservative"]["max_position"], 0.15)
+        self.assertEqual(shells["balanced"]["enter_prob_threshold"], 0.65)
+        self.assertEqual(shells["balanced"]["full_prob_threshold"], 0.80)
 
     def test_cost_aware_round1_matrix_crosses_modes_and_shells(self) -> None:
         matrix = build_cost_aware_round1_matrix()

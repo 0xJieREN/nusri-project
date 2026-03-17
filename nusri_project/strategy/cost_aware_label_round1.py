@@ -4,7 +4,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from nusri_project.strategy.label_optimization_round1 import build_round1_trading_shells
+from nusri_project.strategy.label_optimization_round1 import (
+    build_round1_probability_shells,
+    build_round1_trading_shells,
+)
 from nusri_project.strategy.phase2_strategy_research import run_strategy_config
 from nusri_project.strategy.strategy_config import SpotStrategyConfig
 
@@ -54,7 +57,8 @@ def evaluate_cost_aware_round1(
     deal_price: str = "close",
 ) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
-    shells = build_round1_trading_shells()
+    return_shells = build_round1_trading_shells()
+    probability_shells = build_round1_probability_shells()
 
     for item in build_cost_aware_round1_matrix():
         label_mode = item["label_mode"]
@@ -68,7 +72,7 @@ def evaluate_cost_aware_round1(
         if not prediction_files:
             continue
 
-        shell = shells[shell_name]
+        shell = probability_shells[shell_name] if label_mode == "classification_72h_costaware" else return_shells[shell_name]
         config = SpotStrategyConfig(
             provider_uri=provider_uri,
             instrument=instrument,
@@ -79,9 +83,13 @@ def evaluate_cost_aware_round1(
             fee_rate=fee_rate,
             min_cost=min_cost,
             deal_price=deal_price,
-            entry_threshold=shell["entry_threshold"],
-            exit_threshold=shell["exit_threshold"],
-            full_position_threshold=shell["full_position_threshold"],
+            signal_kind=shell.get("signal_kind", "return"),
+            entry_threshold=shell.get("entry_threshold", 0.0),
+            exit_threshold=shell.get("exit_threshold", 0.0),
+            full_position_threshold=shell.get("full_position_threshold", 0.0),
+            enter_prob_threshold=shell.get("enter_prob_threshold"),
+            exit_prob_threshold=shell.get("exit_prob_threshold"),
+            full_prob_threshold=shell.get("full_prob_threshold"),
             max_position=shell["max_position"],
             min_holding_hours=shell["min_holding_hours"],
             cooldown_hours=shell["cooldown_hours"],

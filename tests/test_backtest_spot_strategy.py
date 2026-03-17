@@ -11,11 +11,14 @@ from nusri_project.strategy.backtest_spot_strategy import (
     _expand_prediction_globs,
     align_backtest_window,
     build_backtest_components,
+    load_prediction_frames,
     normalize_prediction_frame,
     prepare_signal_frame,
     summarize_report,
 )
-from nusri_project.strategy.qlib_spot_strategy import QlibSingleAssetOrderGen, compute_target_weight
+from nusri_project.strategy.probability_signal_strategy import compute_target_weight_from_probability_signal
+from nusri_project.strategy.qlib_spot_strategy import QlibSingleAssetOrderGen
+from nusri_project.strategy.return_signal_strategy import compute_target_weight_from_return_signal
 from nusri_project.strategy.strategy_config import SpotStrategyConfig
 
 
@@ -40,9 +43,25 @@ class SpotBacktestTests(unittest.TestCase):
             [pd.Timestamp("2024-01-01 01:00:00"), pd.Timestamp("2024-01-01 02:00:00")],
         )
 
-    def test_compute_target_weight_applies_thresholds_and_guards(self) -> None:
+    def test_prepare_signal_frame_can_use_probability_signal_column(self) -> None:
+        frame = pd.DataFrame(
+            {
+                "pred_prob": [0.81, 0.67],
+                "real_return": [0.03, -0.01],
+            },
+            index=pd.to_datetime(["2024-01-01 02:00:00", "2024-01-01 01:00:00"]),
+        )
+
+        normalized = normalize_prediction_frame(frame, signal_column="pred_prob")
+        signal = prepare_signal_frame(normalized, instrument="BTCUSDT", signal_column="pred_prob")
+
+        self.assertEqual(list(signal.columns), ["score"])
+        self.assertAlmostEqual(float(signal.iloc[0, 0]), 0.67)
+        self.assertAlmostEqual(float(signal.iloc[1, 0]), 0.81)
+
+    def test_compute_target_weight_from_return_signal_applies_thresholds_and_guards(self) -> None:
         self.assertEqual(
-            compute_target_weight(
+            compute_target_weight_from_return_signal(
                 pred_return=0.03,
                 current_weight=0.0,
                 max_position=1.0,
@@ -61,7 +80,7 @@ class SpotBacktestTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            compute_target_weight(
+            compute_target_weight_from_return_signal(
                 pred_return=-0.01,
                 current_weight=1.0,
                 max_position=1.0,
@@ -80,7 +99,7 @@ class SpotBacktestTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            compute_target_weight(
+            compute_target_weight_from_return_signal(
                 pred_return=0.03,
                 current_weight=0.0,
                 max_position=1.0,
@@ -98,8 +117,8 @@ class SpotBacktestTests(unittest.TestCase):
             0.0,
         )
 
-    def test_compute_target_weight_caps_exposure_in_drawdown(self) -> None:
-        target = compute_target_weight(
+    def test_compute_target_weight_from_return_signal_caps_exposure_in_drawdown(self) -> None:
+        target = compute_target_weight_from_return_signal(
             pred_return=0.03,
             current_weight=0.0,
             max_position=1.0,
@@ -116,6 +135,62 @@ class SpotBacktestTests(unittest.TestCase):
         )
 
         self.assertEqual(target, 0.5)
+
+    def test_compute_target_weight_from_probability_signal_uses_probability_thresholds(self) -> None:
+        self.assertEqual(
+            compute_target_weight_from_probability_signal(
+                pred_prob=0.85,
+                current_weight=0.0,
+                max_position=0.25,
+                enter_prob_threshold=0.65,
+                exit_prob_threshold=0.50,
+                full_prob_threshold=0.80,
+                min_holding_bars=0,
+                holding_bars=0,
+                cooldown_bars=0,
+                bars_since_trade=99,
+                drawdown=0.0,
+                drawdown_de_risk_threshold=0.2,
+                de_risk_position=0.0,
+            ),
+            0.25,
+        )
+        self.assertEqual(
+            compute_target_weight_from_probability_signal(
+                pred_prob=0.70,
+                current_weight=0.0,
+                max_position=0.25,
+                enter_prob_threshold=0.65,
+                exit_prob_threshold=0.50,
+                full_prob_threshold=0.80,
+                min_holding_bars=0,
+                holding_bars=0,
+                cooldown_bars=0,
+                bars_since_trade=99,
+                drawdown=0.0,
+                drawdown_de_risk_threshold=0.2,
+                de_risk_position=0.0,
+            ),
+            0.125,
+        )
+        self.assertEqual(
+            compute_target_weight_from_probability_signal(
+                pred_prob=0.49,
+                current_weight=0.25,
+                max_position=0.25,
+                enter_prob_threshold=0.65,
+                exit_prob_threshold=0.50,
+                full_prob_threshold=0.80,
+                min_holding_bars=0,
+                holding_bars=0,
+                cooldown_bars=0,
+                bars_since_trade=99,
+                drawdown=0.0,
+                drawdown_de_risk_threshold=0.2,
+                de_risk_position=0.0,
+            ),
+            0.0,
+        )
 
     def test_build_backtest_components_uses_qlib_native_executor(self) -> None:
         signal = pd.DataFrame(
@@ -139,8 +214,8 @@ class SpotBacktestTests(unittest.TestCase):
 
         strategy_config, executor_config, backtest_config = build_backtest_components(signal, config)
 
-        self.assertEqual(strategy_config["class"], "QlibLongFlatStrategy")
-        self.assertEqual(strategy_config["module_path"], "nusri_project.strategy.qlib_spot_strategy")
+        self.assertEqual(strategy_config["class"], "QlibReturnLongFlatStrategy")
+        self.assertEqual(strategy_config["module_path"], "nusri_project.strategy.return_signal_strategy")
         self.assertIs(strategy_config["kwargs"]["signal"], signal)
         self.assertEqual(executor_config["class"], "SimulatorExecutor")
         self.assertEqual(executor_config["module_path"], "qlib.backtest.executor")
@@ -149,6 +224,37 @@ class SpotBacktestTests(unittest.TestCase):
         self.assertEqual(backtest_config["exchange_kwargs"]["close_cost"], 0.001)
         self.assertTrue(isinstance(backtest_config["benchmark"], pd.Series))
         self.assertTrue((backtest_config["benchmark"] == 0.0).all())
+
+    def test_build_backtest_components_uses_probability_strategy_when_requested(self) -> None:
+        signal = pd.DataFrame(
+            {"score": [0.81]},
+            index=pd.MultiIndex.from_tuples(
+                [("BTCUSDT", pd.Timestamp("2024-01-01 00:00:00"))],
+                names=["instrument", "datetime"],
+            ),
+        )
+        config = SpotStrategyConfig(
+            provider_uri="/tmp/provider",
+            instrument="BTCUSDT",
+            start_time="2024-01-01 00:00:00",
+            end_time="2024-01-31 23:00:00",
+            initial_cash=100_000.0,
+            fee_rate=0.001,
+            min_cost=0.0,
+            deal_price="close",
+            freq="60min",
+            signal_kind="probability",
+            enter_prob_threshold=0.65,
+            exit_prob_threshold=0.50,
+            full_prob_threshold=0.80,
+        )
+
+        strategy_config, _, _ = build_backtest_components(signal, config)
+
+        self.assertEqual(strategy_config["class"], "QlibProbabilityLongFlatStrategy")
+        self.assertEqual(strategy_config["module_path"], "nusri_project.strategy.probability_signal_strategy")
+        self.assertEqual(strategy_config["kwargs"]["enter_prob_threshold"], 0.65)
+        self.assertEqual(strategy_config["kwargs"]["full_prob_threshold"], 0.80)
 
     def test_summarize_report_uses_net_returns_and_custom_scaler(self) -> None:
         report = pd.DataFrame(
@@ -188,6 +294,18 @@ class SpotBacktestTests(unittest.TestCase):
             resolved = _expand_prediction_globs([str(pred_path)])
 
         self.assertEqual(resolved, [pred_path.resolve()])
+
+    def test_load_prediction_frames_accepts_probability_signal_column(self) -> None:
+        with TemporaryDirectory() as tmp:
+            pred_path = Path(tmp) / "pred_202401.pkl"
+            pd.DataFrame(
+                {"pred_prob": [0.81]},
+                index=pd.to_datetime(["2024-01-01 00:00:00"]),
+            ).to_pickle(pred_path)
+
+            combined = load_prediction_frames([pred_path], signal_column="pred_prob")
+
+        self.assertIn("pred_prob", combined.columns)
 
     def test_align_backtest_window_moves_end_before_last_signal_bar(self) -> None:
         signal = pd.DataFrame(

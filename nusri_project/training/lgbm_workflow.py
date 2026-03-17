@@ -20,6 +20,7 @@ from nusri_project.training.label_factory import (
     get_cost_aware_binary_label_expr,
     get_label_expr,
     get_label_mode_from_config,
+    get_prediction_output_column,
 )
 from nusri_project.training.model_factory import (
     build_lgb_model_config,
@@ -67,19 +68,6 @@ def get_feature_config(feature_set: str):
     if feature_set == "top23":
         return get_top23_config()
     raise ValueError(f"Unknown FEATURE_SET: {feature_set}")
-
-
-def transform_prediction_score(
-    *,
-    raw_prediction: float,
-    label_mode: str,
-    positive_threshold: float = DEFAULT_COST_AWARE_THRESHOLD,
-) -> float:
-    if label_mode.startswith("regression"):
-        return raw_prediction
-    if label_mode == "classification_72h_costaware":
-        return (raw_prediction - 0.5) * (2 * positive_threshold)
-    raise ValueError(f"Unknown label_mode: {label_mode}")
 
 
 def build_prediction_artifact_name(
@@ -249,17 +237,11 @@ def _make_predictions(
     label_mode: str,
     positive_threshold: float,
 ) -> pd.DataFrame:
-    pred = model.predict(dataset, segment=segment).to_frame("pred")
-    pred["pred_return"] = pred["pred"].map(
-        lambda raw: transform_prediction_score(
-            raw_prediction=float(raw),
-            label_mode=label_mode,
-            positive_threshold=positive_threshold,
-        )
-    )
+    prediction_column = get_prediction_output_column(label_mode)
+    pred = model.predict(dataset, segment=segment).to_frame(prediction_column)
 
     actual_return = _load_actual_return(dataset_conf, segment, label_horizon_hours)
-    combined = pred[["pred_return"]].join(actual_return, how="inner").dropna()
+    combined = pred[[prediction_column]].join(actual_return, how="inner").dropna()
     return combined
 
 
@@ -272,9 +254,14 @@ def _print_summary(combined: pd.DataFrame, label_name: str, head_n: int = 10) ->
         )
         return
 
-    ic = combined.corr().iloc[0, 1]
-    rank_ic = combined.corr(method="spearman").iloc[0, 1]
-    same_sign = combined["pred_return"] * combined["real_return"] > 0
+    prediction_column = next(column for column in combined.columns if column != "real_return")
+    prediction_frame = combined[[prediction_column, "real_return"]]
+    ic = prediction_frame.corr().iloc[0, 1]
+    rank_ic = prediction_frame.corr(method="spearman").iloc[0, 1]
+    direction_signal = combined[prediction_column]
+    if prediction_column == "pred_prob":
+        direction_signal = direction_signal - 0.5
+    same_sign = direction_signal * combined["real_return"] > 0
     accuracy = same_sign.sum() / len(same_sign)
 
     dt_index = combined.index.get_level_values(0)

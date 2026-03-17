@@ -37,6 +37,33 @@ def build_round1_trading_shells() -> dict[str, dict]:
     }
 
 
+def build_round1_probability_shells() -> dict[str, dict]:
+    return {
+        "balanced": {
+            "signal_kind": "probability",
+            "enter_prob_threshold": 0.65,
+            "exit_prob_threshold": 0.50,
+            "full_prob_threshold": 0.80,
+            "max_position": 0.25,
+            "min_holding_hours": 48,
+            "cooldown_hours": 12,
+            "drawdown_de_risk_threshold": 0.02,
+            "de_risk_position": 0.10,
+        },
+        "conservative": {
+            "signal_kind": "probability",
+            "enter_prob_threshold": 0.65,
+            "exit_prob_threshold": 0.50,
+            "full_prob_threshold": 0.80,
+            "max_position": 0.15,
+            "min_holding_hours": 48,
+            "cooldown_hours": 12,
+            "drawdown_de_risk_threshold": 0.02,
+            "de_risk_position": 0.0,
+        },
+    }
+
+
 def build_round1_matrix() -> list[dict[str, object]]:
     matrix: list[dict[str, object]] = []
     for label_horizon_hours in build_round1_horizons():
