@@ -4,6 +4,7 @@ from dataclasses import asdict, replace
 from itertools import product
 import json
 from pathlib import Path
+import tomllib
 
 import pandas as pd
 
@@ -81,101 +82,64 @@ def build_parameter_grid(
     return candidates
 
 
-def build_scan_profile(profile: str) -> list[dict]:
-    if profile == "small":
+def _default_config_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "config.toml"
+
+
+def _load_scan_profile_definition(profile: str, config_path: str | Path | None = None) -> dict:
+    path = _default_config_path() if config_path is None else Path(config_path)
+    with path.open("rb") as file_obj:
+        config = tomllib.load(file_obj)
+    profile_table = config.get("scan_profiles", {}).get(profile)
+    if not isinstance(profile_table, dict):
+        raise ValueError(f"unknown scan profile: {profile}")
+    return profile_table
+
+
+def _build_paired_scan_profile(raw: dict) -> list[dict]:
+    threshold_pairs = [(float(pair[0]), float(pair[1])) for pair in raw["threshold_pairs"]]
+    risk_pairs = [(float(pair[0]), float(pair[1])) for pair in raw["risk_pairs"]]
+    max_positions = [float(value) for value in raw["max_positions"]]
+    min_holding_hours_list = [int(value) for value in raw["min_holding_hours_list"]]
+    cooldown_hours = int(raw["cooldown_hours"])
+
+    candidates: list[dict] = []
+    for entry_threshold, full_position_threshold in threshold_pairs:
+        for max_position in max_positions:
+            for min_holding_hours in min_holding_hours_list:
+                for drawdown_de_risk_threshold, de_risk_position in risk_pairs:
+                    candidates.append(
+                        {
+                            "entry_threshold": entry_threshold,
+                            "exit_threshold": 0.0,
+                            "full_position_threshold": full_position_threshold,
+                            "max_position": max_position,
+                            "min_holding_hours": min_holding_hours,
+                            "cooldown_hours": cooldown_hours,
+                            "drawdown_de_risk_threshold": drawdown_de_risk_threshold,
+                            "de_risk_position": de_risk_position,
+                        }
+                    )
+    return candidates
+
+
+def build_scan_profile(profile: str, *, config_path: str | Path | None = None) -> list[dict]:
+    raw = _load_scan_profile_definition(profile, config_path=config_path)
+    kind = str(raw["kind"])
+    if kind == "grid":
         return build_parameter_grid(
-            entry_thresholds=[0.0001, 0.0005],
-            exit_thresholds=[-0.0001, 0.0],
-            full_position_thresholds=[0.0002, 0.001],
-            max_positions=[1.0],
-            min_holding_hours_list=[1, 24],
-            cooldown_hours_list=[1, 12],
-            drawdown_thresholds=[0.08],
-            de_risk_positions=[0.5],
+            entry_thresholds=[float(value) for value in raw["entry_thresholds"]],
+            exit_thresholds=[float(value) for value in raw["exit_thresholds"]],
+            full_position_thresholds=[float(value) for value in raw["full_position_thresholds"]],
+            max_positions=[float(value) for value in raw.get("max_positions", [1.0])],
+            min_holding_hours_list=[int(value) for value in raw["min_holding_hours_list"]],
+            cooldown_hours_list=[int(value) for value in raw["cooldown_hours_list"]],
+            drawdown_thresholds=[float(value) for value in raw["drawdown_thresholds"]],
+            de_risk_positions=[float(value) for value in raw["de_risk_positions"]],
         )
-    if profile == "conservative":
-        return build_parameter_grid(
-            entry_thresholds=[0.001, 0.002, 0.003],
-            exit_thresholds=[0.0],
-            full_position_thresholds=[0.002, 0.004],
-            max_positions=[0.15, 0.25, 0.35, 0.5],
-            min_holding_hours_list=[24, 48],
-            cooldown_hours_list=[12],
-            drawdown_thresholds=[0.02, 0.05],
-            de_risk_positions=[0.0, 0.25],
-        )
-    if profile == "conservative_fast":
-        return build_parameter_grid(
-            entry_thresholds=[0.0015, 0.003],
-            exit_thresholds=[0.0],
-            full_position_thresholds=[0.003],
-            max_positions=[0.15, 0.25],
-            min_holding_hours_list=[24, 48],
-            cooldown_hours_list=[12],
-            drawdown_thresholds=[0.02, 0.05],
-            de_risk_positions=[0.0, 0.25],
-        )
-    if profile == "label72_trade_tuning":
-        threshold_pairs = [
-            (0.0015, 0.003),
-            (0.003, 0.005),
-            (0.005, 0.008),
-            (0.008, 0.012),
-        ]
-        risk_pairs = [
-            (0.02, 0.0),
-            (0.02, 0.10),
-            (0.04, 0.20),
-            (0.06, 0.25),
-        ]
-        candidates: list[dict] = []
-        for entry_threshold, full_position_threshold in threshold_pairs:
-            for max_position in [0.10, 0.15, 0.20, 0.25, 0.35, 0.50]:
-                for min_holding_hours in [48, 72, 96]:
-                    for drawdown_de_risk_threshold, de_risk_position in risk_pairs:
-                        candidates.append(
-                            {
-                                "entry_threshold": entry_threshold,
-                                "exit_threshold": 0.0,
-                                "full_position_threshold": full_position_threshold,
-                                "max_position": max_position,
-                                "min_holding_hours": min_holding_hours,
-                                "cooldown_hours": 12,
-                                "drawdown_de_risk_threshold": drawdown_de_risk_threshold,
-                                "de_risk_position": de_risk_position,
-                            }
-                        )
-        return candidates
-    if profile == "label72_trade_tuning_fast":
-        threshold_pairs = [
-            (0.0015, 0.003),
-            (0.003, 0.005),
-            (0.005, 0.008),
-        ]
-        risk_pairs = [
-            (0.02, 0.0),
-            (0.02, 0.25),
-            (0.04, 0.25),
-        ]
-        candidates: list[dict] = []
-        for entry_threshold, full_position_threshold in threshold_pairs:
-            for max_position in [0.15, 0.25, 0.35]:
-                for min_holding_hours in [48, 72]:
-                    for drawdown_de_risk_threshold, de_risk_position in risk_pairs:
-                        candidates.append(
-                            {
-                                "entry_threshold": entry_threshold,
-                                "exit_threshold": 0.0,
-                                "full_position_threshold": full_position_threshold,
-                                "max_position": max_position,
-                                "min_holding_hours": min_holding_hours,
-                                "cooldown_hours": 12,
-                                "drawdown_de_risk_threshold": drawdown_de_risk_threshold,
-                                "de_risk_position": de_risk_position,
-                            }
-                        )
-        return candidates
-    raise ValueError(f"unknown scan profile: {profile}")
+    if kind == "paired":
+        return _build_paired_scan_profile(raw)
+    raise ValueError(f"unsupported scan profile kind: {kind}")
 
 
 def rank_scan_results(

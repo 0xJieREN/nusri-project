@@ -79,7 +79,7 @@ def main() -> int:
     scan_results = run_parameter_scan(
         prediction_files,
         config,
-        build_scan_profile(args.scan_profile),
+        build_scan_profile(args.scan_profile, config_path=args.config),
     )
     ranked = rank_scan_results(scan_results)
     top_candidates = select_top_feasible_candidates(scan_results, limit=args.top_k)

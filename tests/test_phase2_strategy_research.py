@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import textwrap
 import unittest
 
 import pandas as pd
@@ -16,6 +17,13 @@ from nusri_project.strategy.phase2_strategy_research import (
 
 
 class Phase2StrategyResearchTests(unittest.TestCase):
+    def _write_config(self, body: str) -> Path:
+        temp_dir = TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "config.toml"
+        path.write_text(textwrap.dedent(body).strip() + "\n")
+        return path
+
     def test_find_prediction_files_sorts_yearly_prediction_artifacts(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -109,7 +117,21 @@ class Phase2StrategyResearchTests(unittest.TestCase):
         self.assertEqual(list(ranked["meets_constraints"]), [True, True, False])
 
     def test_build_scan_profile_conservative_includes_lower_max_position(self) -> None:
-        grid = build_scan_profile("conservative")
+        config_path = self._write_config(
+            """
+            [scan_profiles.conservative]
+            kind = "grid"
+            entry_thresholds = [0.001, 0.002, 0.003]
+            exit_thresholds = [0.0]
+            full_position_thresholds = [0.002, 0.004]
+            max_positions = [0.15, 0.25, 0.35, 0.5]
+            min_holding_hours_list = [24, 48]
+            cooldown_hours_list = [12]
+            drawdown_thresholds = [0.02, 0.05]
+            de_risk_positions = [0.0, 0.25]
+            """
+        )
+        grid = build_scan_profile("conservative", config_path=config_path)
 
         self.assertTrue(len(grid) > 0)
         self.assertTrue(all(candidate["max_position"] <= 0.5 for candidate in grid))
@@ -117,13 +139,38 @@ class Phase2StrategyResearchTests(unittest.TestCase):
         self.assertTrue(all(candidate["entry_threshold"] >= 0.001 for candidate in grid))
 
     def test_build_scan_profile_conservative_fast_stays_small(self) -> None:
-        grid = build_scan_profile("conservative_fast")
+        config_path = self._write_config(
+            """
+            [scan_profiles.conservative_fast]
+            kind = "grid"
+            entry_thresholds = [0.0015, 0.003]
+            exit_thresholds = [0.0]
+            full_position_thresholds = [0.003]
+            max_positions = [0.15, 0.25]
+            min_holding_hours_list = [24, 48]
+            cooldown_hours_list = [12]
+            drawdown_thresholds = [0.02, 0.05]
+            de_risk_positions = [0.0, 0.25]
+            """
+        )
+        grid = build_scan_profile("conservative_fast", config_path=config_path)
 
         self.assertTrue(0 < len(grid) <= 32)
         self.assertTrue(all(candidate["max_position"] <= 0.35 for candidate in grid))
 
     def test_build_scan_profile_label72_trade_tuning_uses_targeted_ranges(self) -> None:
-        grid = build_scan_profile("label72_trade_tuning")
+        config_path = self._write_config(
+            """
+            [scan_profiles.label72_trade_tuning]
+            kind = "paired"
+            threshold_pairs = [[0.0015, 0.003], [0.003, 0.005], [0.005, 0.008], [0.008, 0.012]]
+            risk_pairs = [[0.02, 0.0], [0.02, 0.10], [0.04, 0.20], [0.06, 0.25]]
+            max_positions = [0.10, 0.15, 0.20, 0.25, 0.35, 0.50]
+            min_holding_hours_list = [48, 72, 96]
+            cooldown_hours = 12
+            """
+        )
+        grid = build_scan_profile("label72_trade_tuning", config_path=config_path)
 
         self.assertTrue(0 < len(grid) <= 512)
         self.assertTrue(all(candidate["entry_threshold"] in {0.0015, 0.003, 0.005, 0.008} for candidate in grid))
@@ -131,11 +178,28 @@ class Phase2StrategyResearchTests(unittest.TestCase):
         self.assertTrue(all(candidate["min_holding_hours"] in {48, 72, 96} for candidate in grid))
 
     def test_build_scan_profile_label72_trade_tuning_fast_stays_small(self) -> None:
-        grid = build_scan_profile("label72_trade_tuning_fast")
+        config_path = self._write_config(
+            """
+            [scan_profiles.label72_trade_tuning_fast]
+            kind = "paired"
+            threshold_pairs = [[0.0015, 0.003], [0.003, 0.005], [0.005, 0.008]]
+            risk_pairs = [[0.02, 0.0], [0.02, 0.25], [0.04, 0.25]]
+            max_positions = [0.15, 0.25, 0.35]
+            min_holding_hours_list = [48, 72]
+            cooldown_hours = 12
+            """
+        )
+        grid = build_scan_profile("label72_trade_tuning_fast", config_path=config_path)
 
         self.assertTrue(0 < len(grid) <= 64)
         self.assertTrue(all(candidate["entry_threshold"] in {0.0015, 0.003, 0.005} for candidate in grid))
         self.assertTrue(all(candidate["max_position"] in {0.15, 0.25, 0.35} for candidate in grid))
+
+    def test_build_scan_profile_raises_for_missing_profile(self) -> None:
+        config_path = self._write_config("")
+
+        with self.assertRaises(ValueError):
+            build_scan_profile("missing", config_path=config_path)
 
     def test_select_top_feasible_candidates_prefers_sharpe_then_return(self) -> None:
         frame = pd.DataFrame(

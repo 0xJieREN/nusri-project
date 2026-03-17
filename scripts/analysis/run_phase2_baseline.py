@@ -102,7 +102,7 @@ def main() -> int:
     baseline_frame.to_csv(output_dir / "baseline_summary.csv", index=False)
 
     if args.scan:
-        parameter_grid = build_scan_profile(args.scan_profile)
+        parameter_grid = build_scan_profile(args.scan_profile, config_path=args.config)
         scan_results = run_parameter_scan(prediction_files, config, parameter_grid)
         ranked_results = rank_scan_results(scan_results)
         scan_results.to_csv(output_dir / "scan_results.csv", index=False)
